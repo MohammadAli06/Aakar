@@ -5,41 +5,103 @@
 *.swp
 .DS_Store
 .atom/
-.build/
 .buildlog/
 .history
 .svn/
-.swiftpm/
 migrate_working_dir/
+Thumbs.db
 
-# IntelliJ related
+# User-specific files
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# IDE and Editor files
+.idea/
+.vscode/
 *.iml
 *.ipr
 *.iws
-.idea/
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
+# Python & Backend
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+# Flutter application source must remain trackable.
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+backend/.env
+backend/app.db
+backend/test.db
+backend/*.log
 
-# Flutter/Dart/Pub related
-**/doc/api/
-**/ios/Flutter/.last_build_id
+# Flutter & Dart
 .dart_tool/
+.flutter-plugins
 .flutter-plugins-dependencies
+.packages
 .pub-cache/
 .pub/
-/build/
-/coverage/
+build/
+ephemeral/
 
-# Symbolication related
-app.*.symbols
+# Android
+android/.gradle/
+android/local.properties
+android/captures/
+android/gradleApp.setting
+android/m2repository/
+android/app/build/
+android/app/release/
+android/app/debug/
+*.jks
+*.keystore
+key.properties
 
-# Obfuscation related
-app.*.map.json
+# iOS / macOS
+ios/Runner.xcworkspace/
+ios/Runner.xcodeproj/project.xcworkspace/
+ios/Runner.xcodeproj/xcuserdata/
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/App.framework
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/Flutter/Generated.xcconfig
+ios/Flutter/app.fltprivate.d
+ios/DerivedData/
 
-# Android Studio will place build artifacts here
-/android/app/debug
-/android/app/profile
-/android/app/release
+# Windows
+*.cab
+*.msi
+*.msm
+*.msp
+*.lnk
+
+# Environment & Secrets (Firebase, API Keys, Credentials)
+.env
+.env.*
+!.env.example
+serviceAccountKey.json
+google-services.json
+GoogleService-Info.plist

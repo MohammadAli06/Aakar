@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'app.dart';
+import 'core/services/app_providers.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -30,5 +31,9 @@ void main() async {
     debugPrint('Firebase init error (running without Firebase): $e');
   }
 
-  runApp(const ProviderScope(child: CraftConnectApp()));
+  final savedLanguage = await loadSelectedLanguage();
+  runApp(ProviderScope(
+    overrides: [selectedLanguageProvider.overrideWith((ref) => savedLanguage)],
+    child: const AakarApp(),
+  ));
 }

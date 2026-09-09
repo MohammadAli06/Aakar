@@ -1,5 +1,5 @@
 """
-SQLAlchemy ORM Models for CraftConnect.
+SQLAlchemy ORM Models for Aakar.
 All entities carry a verification_status — nothing publishes without artisan approval.
 """
 import uuid

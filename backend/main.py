@@ -1,5 +1,5 @@
 """
-CraftConnect FastAPI Backend — Main Application
+Aakar FastAPI Backend — Main Application
 SIH 2026 · PS 26090 · MoSJE
 """
 from fastapi import FastAPI
@@ -22,7 +22,7 @@ async def lifespan(app: FastAPI):
 
 def create_app() -> FastAPI:
     app = FastAPI(
-        title="CraftConnect API",
+        title="Aakar API",
         description="AI-Driven Market Linkage & Smart Cataloging for Marginalized Artisans",
         version="1.0.0",
         docs_url="/docs",
@@ -48,7 +48,7 @@ def create_app() -> FastAPI:
 
     @app.get("/health")
     async def health():
-        return {"status": "ok", "service": "CraftConnect API"}
+        return {"status": "ok", "service": "Aakar API"}
 
     return app
 

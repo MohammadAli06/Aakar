@@ -1,3 +1,4 @@
+import '../../core/localization/app_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -21,8 +22,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       iconColor: AppColors.primary,
       titleHi: 'फोटो खींचें, हम संवारेंगे',
       titleEn: 'Snap. We enhance.',
-      descHi: 'बस अपने उत्पाद की फोटो लें। हमारी AI उसे e-commerce के लिए तैयार कर देगी — बैकग्राउंड, रोशनी, सब कुछ।',
-      descEn: 'Just click a photo. Our AI makes it e-commerce ready — background, lighting, everything.',
+      descHi:
+          'बस अपने उत्पाद की फोटो लें। हमारी AI उसे e-commerce के लिए तैयार कर देगी — बैकग्राउंड, रोशनी, सब कुछ।',
+      descEn:
+          'Just click a photo. Our AI makes it e-commerce ready — background, lighting, everything.',
       gradient: [Color(0xFFFF6B35), Color(0xFFFF8A5B)],
     ),
     _OnboardingSlide(
@@ -30,8 +33,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       iconColor: AppColors.secondary,
       titleHi: 'बोलें, हम लिखेंगे',
       titleEn: 'Speak. We catalog.',
-      descHi: 'अपनी भाषा में बताएं अपना उत्पाद। AI सुनेगा, समझेगा, और Hindi-English में listing तैयार करेगा।',
-      descEn: 'Describe in your language. AI listens, understands, and builds your bilingual listing.',
+      descHi:
+          'अपनी भाषा में बताएं अपना उत्पाद। AI सुनेगा, समझेगा, और Hindi-English में listing तैयार करेगा।',
+      descEn:
+          'Describe in your language. AI listens, understands, and builds your bilingual listing.',
       gradient: [Color(0xFF6C63FF), Color(0xFF8A84FF)],
     ),
     _OnboardingSlide(
@@ -39,8 +44,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       iconColor: AppColors.accent,
       titleHi: 'सही कीमत, सही मुनाफा',
       titleEn: 'Fair price. Real margin.',
-      descHi: 'AI आपकी मेहनत की लागत देखकर कीमत सुझाएगा — मशीन-निर्मित सामान से तुलना नहीं, बस हस्तशिल्प से।',
-      descEn: 'AI suggests prices respecting your labour — compared only to handmade, never to machine-made.',
+      descHi:
+          'AI आपकी मेहनत की लागत देखकर कीमत सुझाएगा — मशीन-निर्मित सामान से तुलना नहीं, बस हस्तशिल्प से।',
+      descEn:
+          'AI suggests prices respecting your labour — compared only to handmade, never to machine-made.',
       gradient: [Color(0xFFF59E0B), Color(0xFFFF6B35)],
     ),
   ];
@@ -106,7 +113,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       if (_currentPage < _slides.length - 1)
                         TextButton(
                           onPressed: _complete,
-                          child: const Text(
+                          child: const AppText(
                             'Skip',
                             style: TextStyle(color: AppColors.textHint),
                           ),
@@ -140,8 +147,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             borderRadius: BorderRadius.circular(14),
                             boxShadow: [
                               BoxShadow(
-                                color:
-                                    _slides[_currentPage].gradient.first.withOpacity(0.4),
+                                color: _slides[_currentPage]
+                                    .gradient
+                                    .first
+                                    .withOpacity(0.4),
                                 blurRadius: 16,
                                 offset: const Offset(0, 6),
                               ),
@@ -151,7 +160,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             height: 52,
                             width: 140,
                             child: Center(
-                              child: Text(
+                              child: AppText(
                                 _currentPage < _slides.length - 1
                                     ? 'अगला →'
                                     : 'शुरू करें 🎨',
@@ -247,8 +256,8 @@ class _OnboardingPage extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 48),
-          Text(
-            slide.titleHi,
+          AppText(
+            context.isHindi ? slide.titleHi : slide.titleEn,
             textAlign: TextAlign.center,
             style: const TextStyle(
               fontFamily: 'Poppins',
@@ -259,40 +268,15 @@ class _OnboardingPage extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          ShaderMask(
-            shaderCallback: (b) =>
-                LinearGradient(colors: slide.gradient).createShader(b),
-            child: Text(
-              slide.titleEn,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontFamily: 'Poppins',
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-                color: Colors.white,
-              ),
-            ),
-          ),
           const SizedBox(height: 24),
-          Text(
-            slide.descHi,
+          AppText(
+            context.isHindi ? slide.descHi : slide.descEn,
             textAlign: TextAlign.center,
             style: const TextStyle(
               fontFamily: 'Poppins',
               fontSize: 15,
               color: AppColors.textSecondary,
               height: 1.6,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            slide.descEn,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontFamily: 'Poppins',
-              fontSize: 12,
-              color: AppColors.textHint,
-              height: 1.5,
             ),
           ),
           const SizedBox(height: 120),

@@ -1,3 +1,4 @@
+import '../../core/localization/app_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
@@ -22,8 +23,9 @@ class _VoiceCatalogScreenState extends State<VoiceCatalogScreen> {
   bool _isListening = false;
   String _transcript = '';
   List<AttributeField> _attributes = [];
-  List<AttributeField> get _missingAttributes =>
-      _attributes.where((a) => (a.value == null || a.value!.isEmpty) && a.isRequired).toList();
+  List<AttributeField> get _missingAttributes => _attributes
+      .where((a) => (a.value == null || a.value!.isEmpty) && a.isRequired)
+      .toList();
 
   // Follow-up answers
   final Map<String, String> _followUpAnswers = {};
@@ -50,10 +52,12 @@ class _VoiceCatalogScreenState extends State<VoiceCatalogScreen> {
 
   Future<void> _processVoice() async {
     setState(() => _stage = _CatalogStage.processing);
-    final text = await MockAIService.transcribeVoice('', 'hi');
+    final text = await MockAIService.transcribeVoice(
+        '', Localizations.localeOf(context).languageCode);
     if (!mounted) return;
     setState(() => _transcript = text);
-    final attrs = await MockAIService.extractAttributes(text, CraftCategory.pottery);
+    final attrs =
+        await MockAIService.extractAttributes(text, CraftCategory.pottery);
     if (!mounted) return;
     setState(() {
       _attributes = attrs;
@@ -73,7 +77,8 @@ class _VoiceCatalogScreenState extends State<VoiceCatalogScreen> {
       setState(() {
         _attributes = _attributes.map((a) {
           if (a.key == key) {
-            return a.copyWith(value: _answerController.text.trim(), confidence: 0.95);
+            return a.copyWith(
+                value: _answerController.text.trim(), confidence: 0.95);
           }
           return a;
         }).toList();
@@ -96,7 +101,7 @@ class _VoiceCatalogScreenState extends State<VoiceCatalogScreen> {
           icon: const Icon(Icons.arrow_back_ios_rounded),
           onPressed: () => context.pop(),
         ),
-        title: const Text('स्मार्ट कैटालॉग'),
+        title: const AppText('स्मार्ट कैटालॉग'),
       ),
       body: SafeArea(
         child: switch (_stage) {
@@ -120,20 +125,31 @@ class _VoiceCatalogScreenState extends State<VoiceCatalogScreen> {
           GlassCard(
             child: Column(
               children: [
-                const Text(
+                const AppText(
                   '🎤 अपने उत्पाद के बारे में बताएं',
-                  style: TextStyle(fontFamily: 'Poppins', fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                  style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary),
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                const AppText(
                   'जैसे: "यह मेरे हाथ से बना मिट्टी का मटका है, राजस्थान से, ऊँचाई 30 cm..."',
-                  style: TextStyle(fontFamily: 'Poppins', fontSize: 12, color: AppColors.textSecondary, height: 1.5),
+                  style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                      height: 1.5),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 4),
-                const Text(
+                const AppText(
                   'Speak freely about your product in any language.',
-                  style: TextStyle(fontFamily: 'Poppins', fontSize: 11, color: AppColors.textHint),
+                  style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 11,
+                      color: AppColors.textHint),
                   textAlign: TextAlign.center,
                 ),
               ],
@@ -155,24 +171,34 @@ class _VoiceCatalogScreenState extends State<VoiceCatalogScreen> {
           const SizedBox(height: 20),
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 300),
-            child: Text(
+            child: AppText(
               _isListening ? 'सुन रहा हूँ... बोलते रहें' : 'बोलने के लिए दबाएं',
               key: ValueKey(_isListening),
               style: TextStyle(
                 fontFamily: 'Poppins',
                 fontSize: 16,
                 fontWeight: FontWeight.w500,
-                color: _isListening ? AppColors.accentRed : AppColors.textSecondary,
+                color: _isListening
+                    ? AppColors.accentRed
+                    : AppColors.textSecondary,
               ),
             ),
           ),
           if (!_isListening)
-            const Text('Tap to speak', style: TextStyle(fontFamily: 'Poppins', fontSize: 12, color: AppColors.textHint)),
+            const AppText('Tap to speak',
+                style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 12,
+                    color: AppColors.textHint)),
           const Spacer(),
           // Skip to demo
           TextButton(
             onPressed: _processVoice,
-            child: const Text('Demo: Auto-fill', style: TextStyle(fontFamily: 'Poppins', color: AppColors.textHint, fontSize: 12)),
+            child: const AppText('Demo: Auto-fill',
+                style: TextStyle(
+                    fontFamily: 'Poppins',
+                    color: AppColors.textHint,
+                    fontSize: 12)),
           ),
         ],
       ),
@@ -189,17 +215,35 @@ class _VoiceCatalogScreenState extends State<VoiceCatalogScreen> {
             height: 100,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              gradient: const LinearGradient(colors: [AppColors.primary, AppColors.secondary]),
-              boxShadow: [BoxShadow(color: AppColors.primary.withOpacity(0.4), blurRadius: 30)],
+              gradient: const LinearGradient(
+                  colors: [AppColors.primary, AppColors.secondary]),
+              boxShadow: [
+                BoxShadow(
+                    color: AppColors.primary.withOpacity(0.4), blurRadius: 30)
+              ],
             ),
-            child: const Icon(Icons.psychology_rounded, color: Colors.white, size: 48),
+            child: const Icon(Icons.psychology_rounded,
+                color: Colors.white, size: 48),
           ),
           const SizedBox(height: 28),
-          const Text('AI समझ रहा है...', style: TextStyle(fontFamily: 'Poppins', fontSize: 20, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+          const AppText('AI समझ रहा है...',
+              style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary)),
           const SizedBox(height: 8),
-          const Text('Analyzing your description...', style: TextStyle(fontFamily: 'Poppins', fontSize: 13, color: AppColors.textHint)),
+          const AppText('Analyzing your description...',
+              style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 13,
+                  color: AppColors.textHint)),
           const SizedBox(height: 24),
-          const SizedBox(width: 200, child: LinearProgressIndicator(backgroundColor: AppColors.surface, color: AppColors.primary)),
+          const SizedBox(
+              width: 200,
+              child: LinearProgressIndicator(
+                  backgroundColor: AppColors.surface,
+                  color: AppColors.primary)),
         ],
       ),
     );
@@ -222,13 +266,20 @@ class _VoiceCatalogScreenState extends State<VoiceCatalogScreen> {
           // Progress indicator
           Row(
             children: [
-              Text(
-                'प्रश्न ${_followUpIndex + 1}/${missing.length}',
-                style: const TextStyle(fontFamily: 'Poppins', fontSize: 12, color: AppColors.textHint),
+              AppText(
+                '${context.tr('Question')} ${_followUpIndex + 1}/${missing.length}',
+                style: const TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 12,
+                    color: AppColors.textHint),
               ),
               const Spacer(),
-              Text('${missing.length - _followUpIndex - 1} remaining',
-                  style: const TextStyle(fontFamily: 'Poppins', fontSize: 12, color: AppColors.textHint)),
+              AppText(
+                  '${missing.length - _followUpIndex - 1} ${context.tr('remaining')}',
+                  style: const TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 12,
+                      color: AppColors.textHint)),
             ],
           ),
           const SizedBox(height: 8),
@@ -247,28 +298,44 @@ class _VoiceCatalogScreenState extends State<VoiceCatalogScreen> {
             height: 64,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              gradient: const LinearGradient(colors: [AppColors.primary, AppColors.secondary]),
-              boxShadow: [BoxShadow(color: AppColors.primary.withOpacity(0.35), blurRadius: 20)],
+              gradient: const LinearGradient(
+                  colors: [AppColors.primary, AppColors.secondary]),
+              boxShadow: [
+                BoxShadow(
+                    color: AppColors.primary.withOpacity(0.35), blurRadius: 20)
+              ],
             ),
-            child: const Icon(Icons.question_mark_rounded, color: Colors.white, size: 30),
+            child: const Icon(Icons.question_mark_rounded,
+                color: Colors.white, size: 30),
           ),
           const SizedBox(height: 24),
-          Text(
-            '${current.labelHi} क्या है?',
-            style: const TextStyle(fontFamily: 'Poppins', fontSize: 24, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+          AppText(
+            context.isHindi
+                ? '${current.labelHi} क्या है?'
+                : 'What is the ${current.labelEn}?',
+            style: const TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 24,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary),
           ),
           const SizedBox(height: 4),
-          Text(
-            'What is the ${current.labelEn}?',
-            style: const TextStyle(fontFamily: 'Poppins', fontSize: 14, color: AppColors.textHint),
-          ),
+
           const SizedBox(height: 32),
           TextField(
             controller: _answerController,
-            style: const TextStyle(fontFamily: 'Poppins', fontSize: 16, color: AppColors.textPrimary),
+            style: const TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 16,
+                color: AppColors.textPrimary),
             decoration: InputDecoration(
-              hintText: '${current.labelHi} लिखें / Type ${current.labelEn}',
-              hintStyle: const TextStyle(fontFamily: 'Poppins', fontSize: 14, color: AppColors.textHint),
+              hintText: context.isHindi
+                  ? '${current.labelHi} लिखें'
+                  : 'Type ${current.labelEn}',
+              hintStyle: const TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 14,
+                  color: AppColors.textHint),
             ),
             onSubmitted: (_) => _submitFollowUp(),
           ),
@@ -278,12 +345,23 @@ class _VoiceCatalogScreenState extends State<VoiceCatalogScreen> {
             child: Container(
               height: 56,
               decoration: BoxDecoration(
-                gradient: const LinearGradient(colors: [AppColors.primary, AppColors.secondary]),
+                gradient: const LinearGradient(
+                    colors: [AppColors.primary, AppColors.secondary]),
                 borderRadius: BorderRadius.circular(16),
-                boxShadow: [BoxShadow(color: AppColors.primary.withOpacity(0.35), blurRadius: 20, offset: const Offset(0, 6))],
+                boxShadow: [
+                  BoxShadow(
+                      color: AppColors.primary.withOpacity(0.35),
+                      blurRadius: 20,
+                      offset: const Offset(0, 6))
+                ],
               ),
               child: const Center(
-                child: Text('अगला →', style: TextStyle(fontFamily: 'Poppins', fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)),
+                child: AppText('अगला →',
+                    style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white)),
               ),
             ),
           ),
@@ -308,12 +386,17 @@ class _VoiceCatalogScreenState extends State<VoiceCatalogScreen> {
             ),
             child: Row(
               children: [
-                const Icon(Icons.record_voice_over_rounded, color: AppColors.primary, size: 16),
+                const Icon(Icons.record_voice_over_rounded,
+                    color: AppColors.primary, size: 16),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text(
+                  child: AppText(
                     _transcript,
-                    style: const TextStyle(fontFamily: 'Poppins', fontSize: 11, color: AppColors.textSecondary, height: 1.4),
+                    style: const TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 11,
+                        color: AppColors.textSecondary,
+                        height: 1.4),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -326,18 +409,29 @@ class _VoiceCatalogScreenState extends State<VoiceCatalogScreen> {
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
           child: Row(
             children: [
-              const Text('🧠 AI ने समझा', style: TextStyle(fontFamily: 'Poppins', fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+              const AppText('🧠 AI ने समझा',
+                  style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary)),
               const Spacer(),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: AppColors.accentGreen.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppColors.accentGreen.withOpacity(0.3)),
+                  border:
+                      Border.all(color: AppColors.accentGreen.withOpacity(0.3)),
                 ),
-                child: Text(
-                  '${_attributes.where((a) => a.confidence >= 0.8).length}/${_attributes.length} High',
-                  style: const TextStyle(fontFamily: 'Poppins', fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.accentGreen),
+                child: AppText(
+                  '${_attributes.where((a) => a.confidence >= 0.8).length}/${_attributes.length} ${context.tr('High')}',
+                  style: const TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.accentGreen),
                 ),
               ),
             ],
@@ -357,13 +451,20 @@ class _VoiceCatalogScreenState extends State<VoiceCatalogScreen> {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
           child: GestureDetector(
-            onTap: () => context.push('/listing-preview', extra: widget.productId),
+            onTap: () =>
+                context.push('/listing-preview', extra: widget.productId),
             child: Container(
               height: 56,
               decoration: BoxDecoration(
-                gradient: const LinearGradient(colors: [AppColors.primary, AppColors.secondary]),
+                gradient: const LinearGradient(
+                    colors: [AppColors.primary, AppColors.secondary]),
                 borderRadius: BorderRadius.circular(16),
-                boxShadow: [BoxShadow(color: AppColors.primary.withOpacity(0.4), blurRadius: 20, offset: const Offset(0, 6))],
+                boxShadow: [
+                  BoxShadow(
+                      color: AppColors.primary.withOpacity(0.4),
+                      blurRadius: 20,
+                      offset: const Offset(0, 6))
+                ],
               ),
               child: const Center(
                 child: Row(
@@ -371,7 +472,12 @@ class _VoiceCatalogScreenState extends State<VoiceCatalogScreen> {
                   children: [
                     Icon(Icons.auto_awesome_rounded, color: Colors.white),
                     SizedBox(width: 8),
-                    Text('Listing बनाएं →', style: TextStyle(fontFamily: 'Poppins', fontSize: 15, fontWeight: FontWeight.w600, color: Colors.white)),
+                    AppText('Listing बनाएं →',
+                        style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white)),
                   ],
                 ),
               ),
@@ -383,7 +489,7 @@ class _VoiceCatalogScreenState extends State<VoiceCatalogScreen> {
   }
 
   Widget _buildDone() {
-    return const Center(child: Text('Done'));
+    return const Center(child: AppText('Done'));
   }
 
   void _showEditDialog(AttributeField field, int index) {
@@ -393,23 +499,35 @@ class _VoiceCatalogScreenState extends State<VoiceCatalogScreen> {
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text('${field.labelHi} बदलें', style: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+        title: AppText(
+            context.isHindi
+                ? '${field.labelHi} बदलें'
+                : 'Edit ${field.labelEn}',
+            style: const TextStyle(
+                fontFamily: 'Poppins',
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary)),
         content: TextField(
           controller: controller,
-          style: const TextStyle(fontFamily: 'Poppins', color: AppColors.textPrimary),
-          decoration: InputDecoration(hintText: field.labelEn),
+          style: const TextStyle(
+              fontFamily: 'Poppins', color: AppColors.textPrimary),
+          decoration: InputDecoration(
+              hintText: context.isHindi ? field.labelHi : field.labelEn),
           autofocus: true,
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const AppText('Cancel')),
           ElevatedButton(
             onPressed: () {
               setState(() {
-                _attributes[index] = field.copyWith(value: controller.text, confidence: 1.0);
+                _attributes[index] =
+                    field.copyWith(value: controller.text, confidence: 1.0);
               });
               Navigator.pop(ctx);
             },
-            child: const Text('Save'),
+            child: const AppText('Save'),
           ),
         ],
       ),

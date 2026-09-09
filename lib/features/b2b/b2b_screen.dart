@@ -1,3 +1,4 @@
+import '../../core/localization/app_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
@@ -47,14 +48,31 @@ class _B2BScreenState extends State<B2BScreen> {
   ];
 
   Future<void> _checkReadiness(String channelId) async {
-    setState(() { _selectedChannelId = channelId; _loading = true; _readiness = null; });
+    setState(() {
+      _selectedChannelId = channelId;
+      _loading = true;
+      _readiness = null;
+    });
     final result = await MockAIService.checkB2BReadiness(
       widget.productId,
       channelId,
-      ProductListing(id: '', productId: '', titleEn: '', titleHi: '', descEn: '', descHi: '', attributes: [], tags: [], verificationStatus: VerificationStatus.approved),
+      ProductListing(
+          id: '',
+          productId: '',
+          titleEn: '',
+          titleHi: '',
+          descEn: '',
+          descHi: '',
+          attributes: [],
+          tags: [],
+          verificationStatus: VerificationStatus.approved),
       null,
     );
-    if (mounted) setState(() { _readiness = result; _loading = false; });
+    if (mounted)
+      setState(() {
+        _readiness = result;
+        _loading = false;
+      });
   }
 
   @override
@@ -66,7 +84,7 @@ class _B2BScreenState extends State<B2BScreen> {
           icon: const Icon(Icons.arrow_back_ios_rounded),
           onPressed: () => context.pop(),
         ),
-        title: const Text('B2B / सरकारी बाज़ार'),
+        title: const AppText('B2B / सरकारी बाज़ार'),
       ),
       body: SafeArea(
         child: ListView(
@@ -86,15 +104,26 @@ class _B2BScreenState extends State<B2BScreen> {
               ),
               child: const Row(
                 children: [
-                  Text('🤝', style: TextStyle(fontSize: 36)),
+                  AppText('🤝', style: TextStyle(fontSize: 36)),
                   SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('B2B बाज़ार तक पहुँचें', style: TextStyle(fontFamily: 'Poppins', fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                        AppText('B2B बाज़ार तक पहुँचें',
+                            style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textPrimary)),
                         SizedBox(height: 4),
-                        Text('Check what you need to list on govt. & B2B platforms. We\'ll tell you exactly what\'s missing.', style: TextStyle(fontFamily: 'Poppins', fontSize: 11, color: AppColors.textSecondary, height: 1.4)),
+                        AppText(
+                            'Check what you need to list on govt. & B2B platforms. We\'ll tell you exactly what\'s missing.',
+                            style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 11,
+                                color: AppColors.textSecondary,
+                                height: 1.4)),
                       ],
                     ),
                   ),
@@ -102,7 +131,12 @@ class _B2BScreenState extends State<B2BScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            const Text('बाज़ार चुनें  •  Choose Marketplace', style: TextStyle(fontFamily: 'Poppins', fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+            const AppText('बाज़ार चुनें  •  Choose Marketplace',
+                style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary)),
             const SizedBox(height: 12),
             // Channel cards
             ..._channels.map((ch) {
@@ -114,13 +148,23 @@ class _B2BScreenState extends State<B2BScreen> {
                   margin: const EdgeInsets.only(bottom: 12),
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: isSelected ? ch.color.withOpacity(0.1) : AppColors.surface,
+                    color: isSelected
+                        ? ch.color.withOpacity(0.1)
+                        : AppColors.surface,
                     borderRadius: BorderRadius.circular(18),
                     border: Border.all(
-                      color: isSelected ? ch.color.withOpacity(0.5) : AppColors.glassBorder,
+                      color: isSelected
+                          ? ch.color.withOpacity(0.5)
+                          : AppColors.glassBorder,
                       width: isSelected ? 2 : 1,
                     ),
-                    boxShadow: isSelected ? [BoxShadow(color: ch.color.withOpacity(0.15), blurRadius: 12)] : null,
+                    boxShadow: isSelected
+                        ? [
+                            BoxShadow(
+                                color: ch.color.withOpacity(0.15),
+                                blurRadius: 12)
+                          ]
+                        : null,
                   ),
                   child: Row(
                     children: [
@@ -132,16 +176,25 @@ class _B2BScreenState extends State<B2BScreen> {
                           color: ch.color.withOpacity(0.15),
                           border: Border.all(color: ch.color.withOpacity(0.3)),
                         ),
-                        child: Center(child: Text(ch.emoji, style: const TextStyle(fontSize: 24))),
+                        child: Center(
+                            child: AppText(ch.emoji,
+                                style: const TextStyle(fontSize: 24))),
                       ),
                       const SizedBox(width: 14),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(ch.nameHi, style: TextStyle(fontFamily: 'Poppins', fontSize: 14, fontWeight: FontWeight.w700, color: isSelected ? ch.color : AppColors.textPrimary)),
-                            Text(ch.name, style: const TextStyle(fontFamily: 'Poppins', fontSize: 11, color: AppColors.textHint)),
-                            Text(ch.desc, style: const TextStyle(fontFamily: 'Poppins', fontSize: 11, color: AppColors.textSecondary)),
+                            AppText(context.isHindi ? ch.nameHi : ch.name,
+                                style: const TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontSize: 11,
+                                    color: AppColors.textHint)),
+                            AppText(ch.desc,
+                                style: const TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontSize: 11,
+                                    color: AppColors.textSecondary)),
                           ],
                         ),
                       ),
@@ -153,10 +206,12 @@ class _B2BScreenState extends State<B2BScreen> {
                             shape: BoxShape.circle,
                             color: ch.color,
                           ),
-                          child: const Icon(Icons.check_rounded, color: Colors.white, size: 16),
+                          child: const Icon(Icons.check_rounded,
+                              color: Colors.white, size: 16),
                         )
                       else
-                        Icon(Icons.arrow_forward_ios_rounded, color: AppColors.textHint, size: 14),
+                        Icon(Icons.arrow_forward_ios_rounded,
+                            color: AppColors.textHint, size: 14),
                     ],
                   ),
                 ),
@@ -166,9 +221,13 @@ class _B2BScreenState extends State<B2BScreen> {
             // Readiness result
             if (_loading) ...[
               const SizedBox(height: 20),
-              const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+              const Center(
+                  child: CircularProgressIndicator(color: AppColors.primary)),
               const SizedBox(height: 12),
-              const Center(child: Text('जाँच रहे हैं...', style: TextStyle(fontFamily: 'Poppins', color: AppColors.textHint))),
+              const Center(
+                  child: AppText('जाँच रहे हैं...',
+                      style: TextStyle(
+                          fontFamily: 'Poppins', color: AppColors.textHint))),
             ],
 
             if (_readiness != null && !_loading) ...[
@@ -186,9 +245,14 @@ class _B2BScreenState extends State<B2BScreen> {
                   children: [
                     Row(
                       children: [
-                        const Text('तैयारी स्कोर  •  Readiness Score', style: TextStyle(fontFamily: 'Poppins', fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                        const AppText('तैयारी स्कोर  •  Readiness Score',
+                            style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textPrimary)),
                         const Spacer(),
-                        Text(
+                        AppText(
                           '${(_readiness!.readinessScore * 100).toInt()}%',
                           style: TextStyle(
                             fontFamily: 'Poppins',
@@ -224,40 +288,65 @@ class _B2BScreenState extends State<B2BScreen> {
                     if (_readiness!.missingFields.isNotEmpty) ...[
                       const Row(
                         children: [
-                          Icon(Icons.info_outline_rounded, color: AppColors.warning, size: 18),
+                          Icon(Icons.info_outline_rounded,
+                              color: AppColors.warning, size: 18),
                           SizedBox(width: 8),
-                          Text('क्या चाहिए  •  What\'s Missing', style: TextStyle(fontFamily: 'Poppins', fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.warning)),
+                          AppText('क्या चाहिए  •  What\'s Missing',
+                              style: TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.warning)),
                         ],
                       ),
                       const SizedBox(height: 10),
                       ..._readiness!.missingFields.map((f) => Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 6,
-                              height: 6,
-                              decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.warning),
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 6,
+                                  height: 6,
+                                  decoration: const BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: AppColors.warning),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                    child: AppText(f,
+                                        style: const TextStyle(
+                                            fontFamily: 'Poppins',
+                                            fontSize: 13,
+                                            color: AppColors.textSecondary))),
+                                TextButton(
+                                  onPressed: () {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                          content: AppText(
+                                              '${context.tr('Fill in')}: ${context.tr(f)}')),
+                                    );
+                                  },
+                                  child: const AppText('भरें',
+                                      style: TextStyle(
+                                          fontFamily: 'Poppins',
+                                          fontSize: 12,
+                                          color: AppColors.primary)),
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 10),
-                            Expanded(child: Text(f, style: const TextStyle(fontFamily: 'Poppins', fontSize: 13, color: AppColors.textSecondary))),
-                            TextButton(
-                              onPressed: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Fill: $f')),
-                                );
-                              },
-                              child: const Text('भरें', style: TextStyle(fontFamily: 'Poppins', fontSize: 12, color: AppColors.primary)),
-                            ),
-                          ],
-                        ),
-                      )),
+                          )),
                     ] else ...[
                       const Row(
                         children: [
-                          Icon(Icons.check_circle_rounded, color: AppColors.accentGreen, size: 20),
+                          Icon(Icons.check_circle_rounded,
+                              color: AppColors.accentGreen, size: 20),
                           SizedBox(width: 8),
-                          Text('सब कुछ तैयार है!  •  All requirements met!', style: TextStyle(fontFamily: 'Poppins', fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.accentGreen)),
+                          AppText('सब कुछ तैयार है!  •  All requirements met!',
+                              style: TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.accentGreen)),
                         ],
                       ),
                     ],
@@ -272,16 +361,28 @@ class _B2BScreenState extends State<B2BScreen> {
                     context: context,
                     builder: (ctx) => AlertDialog(
                       backgroundColor: AppColors.surface,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                      title: const Text('🎉 आवेदन भेजा गया!', style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-                      content: const Text(
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20)),
+                      title: const AppText('🎉 आवेदन भेजा गया!',
+                          style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary)),
+                      content: const AppText(
                         'आपका listing B2B channel पर भेज दिया गया है। खरीदार जल्द संपर्क करेंगे।\n\nYour listing has been submitted. Buyers will contact you soon.',
-                        style: TextStyle(fontFamily: 'Poppins', fontSize: 13, color: AppColors.textSecondary, height: 1.5),
+                        style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 13,
+                            color: AppColors.textSecondary,
+                            height: 1.5),
                       ),
                       actions: [
                         ElevatedButton(
-                          onPressed: () { Navigator.pop(ctx); context.go('/dashboard'); },
-                          child: const Text('Dashboard पर जाएं'),
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            context.go('/dashboard');
+                          },
+                          child: const AppText('Dashboard पर जाएं'),
                         ),
                       ],
                     ),
@@ -290,9 +391,15 @@ class _B2BScreenState extends State<B2BScreen> {
                 child: Container(
                   height: 56,
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(colors: [AppColors.secondary, Color(0xFF8A84FF)]),
+                    gradient: const LinearGradient(
+                        colors: [AppColors.secondary, Color(0xFF8A84FF)]),
                     borderRadius: BorderRadius.circular(16),
-                    boxShadow: [BoxShadow(color: AppColors.secondary.withOpacity(0.4), blurRadius: 20, offset: const Offset(0, 6))],
+                    boxShadow: [
+                      BoxShadow(
+                          color: AppColors.secondary.withOpacity(0.4),
+                          blurRadius: 20,
+                          offset: const Offset(0, 6))
+                    ],
                   ),
                   child: const Center(
                     child: Row(
@@ -300,7 +407,12 @@ class _B2BScreenState extends State<B2BScreen> {
                       children: [
                         Icon(Icons.send_rounded, color: Colors.white),
                         SizedBox(width: 8),
-                        Text('B2B Channel से जोड़ें  •  Connect Now', style: TextStyle(fontFamily: 'Poppins', fontSize: 15, fontWeight: FontWeight.w600, color: Colors.white)),
+                        AppText('B2B Channel से जोड़ें  •  Connect Now',
+                            style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white)),
                       ],
                     ),
                   ),
@@ -322,5 +434,11 @@ class _Channel {
   final String desc;
   final String emoji;
   final Color color;
-  const _Channel({required this.id, required this.name, required this.nameHi, required this.desc, required this.emoji, required this.color});
+  const _Channel(
+      {required this.id,
+      required this.name,
+      required this.nameHi,
+      required this.desc,
+      required this.emoji,
+      required this.color});
 }

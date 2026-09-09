@@ -1,3 +1,4 @@
+import '../../core/localization/app_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -34,7 +35,7 @@ class LanguageSelectionScreen extends ConsumerWidget {
                 shaderCallback: (b) => const LinearGradient(
                   colors: [AppColors.primary, AppColors.secondary],
                 ).createShader(b),
-                child: const Text(
+                child: const AppText(
                   'भाषा चुनें',
                   style: TextStyle(
                     fontFamily: 'Poppins',
@@ -45,16 +46,8 @@ class LanguageSelectionScreen extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 4),
-              const Text(
-                'Choose your language',
-                style: TextStyle(
-                  fontFamily: 'Poppins',
-                  fontSize: 16,
-                  color: AppColors.textSecondary,
-                ),
-              ),
               const SizedBox(height: 8),
-              const Text(
+              const AppText(
                 'आप बाद में इसे बदल सकते हैं',
                 style: TextStyle(
                   fontFamily: 'Poppins',
@@ -76,11 +69,16 @@ class LanguageSelectionScreen extends ConsumerWidget {
                   itemBuilder: (context, i) {
                     final lang = _languages[i];
                     final isSelected = selected == lang['code'];
+                    final available =
+                        lang['code'] == 'en' || lang['code'] == 'hi';
                     return GestureDetector(
-                      onTap: () {
-                        ref.read(selectedLanguageProvider.notifier).state =
-                            lang['code']!;
-                      },
+                      onTap: !available
+                          ? null
+                          : () {
+                              ref
+                                  .read(selectedLanguageProvider.notifier)
+                                  .state = lang['code']!;
+                            },
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 200),
                         decoration: BoxDecoration(
@@ -88,7 +86,10 @@ class LanguageSelectionScreen extends ConsumerWidget {
                               ? const LinearGradient(
                                   begin: Alignment.topLeft,
                                   end: Alignment.bottomRight,
-                                  colors: [AppColors.primary, AppColors.secondary],
+                                  colors: [
+                                    AppColors.primary,
+                                    AppColors.secondary
+                                  ],
                                 )
                               : null,
                           color: isSelected ? null : AppColors.surface,
@@ -112,7 +113,7 @@ class LanguageSelectionScreen extends ConsumerWidget {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Text(
+                            AppText(
                               lang['flag']!,
                               style: const TextStyle(fontSize: 28),
                             ),
@@ -128,8 +129,10 @@ class LanguageSelectionScreen extends ConsumerWidget {
                                     : AppColors.textPrimary,
                               ),
                             ),
-                            Text(
-                              lang['sub']!,
+                            AppText(
+                              available
+                                  ? lang['sub']!
+                                  : context.tr('Coming soon'),
                               style: TextStyle(
                                 fontFamily: 'Poppins',
                                 fontSize: 11,
@@ -151,7 +154,13 @@ class LanguageSelectionScreen extends ConsumerWidget {
                 onPressed: () async {
                   final prefs = await SharedPreferences.getInstance();
                   await prefs.setString('selected_language', selected);
-                  if (context.mounted) context.go('/onboarding');
+                  if (context.mounted) {
+                    if (context.canPop()) {
+                      context.pop();
+                    } else {
+                      context.go('/onboarding');
+                    }
+                  }
                 },
                 style: ElevatedButton.styleFrom(
                   padding: EdgeInsets.zero,
@@ -179,7 +188,7 @@ class LanguageSelectionScreen extends ConsumerWidget {
                   child: const SizedBox(
                     height: 56,
                     child: Center(
-                      child: Text(
+                      child: AppText(
                         'आगे बढ़ें  →',
                         style: TextStyle(
                           fontFamily: 'Poppins',

@@ -1,3 +1,4 @@
+import '../../core/localization/app_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -85,6 +86,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
           // App bar
           SliverAppBar(
             expandedHeight: 200,
+            actions: [
+              IconButton(
+                tooltip: context.tr('Choose your language'),
+                icon: const Icon(Icons.language),
+                onPressed: () => context.push('/language'),
+              )
+            ],
             pinned: true,
             backgroundColor: AppColors.background,
             flexibleSpace: FlexibleSpaceBar(
@@ -93,7 +101,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [Color(0xFF1A0A2E), Color(0xFF0A1A2E), AppColors.background],
+                    colors: [
+                      Color(0xFF1A0A2E),
+                      Color(0xFF0A1A2E),
+                      AppColors.background
+                    ],
                   ),
                 ),
                 child: SafeArea(
@@ -111,12 +123,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 gradient: const LinearGradient(
-                                  colors: [AppColors.primary, AppColors.secondary],
+                                  colors: [
+                                    AppColors.primary,
+                                    AppColors.secondary
+                                  ],
                                 ),
                               ),
                               child: Center(
-                                child: Text(
-                                  _artisanName.isNotEmpty ? _artisanName[0].toUpperCase() : 'K',
+                                child: AppText(
+                                  _artisanName.isNotEmpty
+                                      ? _artisanName[0].toUpperCase()
+                                      : 'K',
                                   style: const TextStyle(
                                     fontFamily: 'Poppins',
                                     fontSize: 20,
@@ -131,8 +148,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    '$_greeting, $_artisanName! 🎨',
+                                  AppText(
+                                    '${context.tr(_greeting)}, $_artisanName! 🎨',
                                     style: const TextStyle(
                                       fontFamily: 'Poppins',
                                       fontSize: 15,
@@ -142,7 +159,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
-                                  Text(
+                                  AppText(
                                     _craftCategory.capitalize(),
                                     style: const TextStyle(
                                       fontFamily: 'Poppins',
@@ -160,7 +177,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 color: AppColors.surface,
-                                border: Border.all(color: AppColors.glassBorder),
+                                border:
+                                    Border.all(color: AppColors.glassBorder),
                               ),
                               child: const Icon(Icons.notifications_outlined,
                                   color: AppColors.textSecondary, size: 20),
@@ -171,12 +189,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         // Stats row
                         Row(
                           children: [
-                            _StatCard(label: 'उत्पाद', labelEn: 'Products', value: '${_products.length}', icon: Icons.inventory_2_rounded, color: AppColors.primary),
+                            _StatCard(
+                                label: 'उत्पाद',
+                                labelEn: 'Products',
+                                value: '${_products.length}',
+                                icon: Icons.inventory_2_rounded,
+                                color: AppColors.primary),
                             const SizedBox(width: 10),
                             _StatCard(
                               label: 'सत्यापित',
                               labelEn: 'Approved',
-                              value: '${_products.where((p) => p.verificationStatus == VerificationStatus.approved).length}',
+                              value:
+                                  '${_products.where((p) => p.verificationStatus == VerificationStatus.approved).length}',
                               icon: Icons.verified_rounded,
                               color: AppColors.accentGreen,
                             ),
@@ -184,7 +208,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             _StatCard(
                               label: 'B2B तैयार',
                               labelEn: 'B2B Ready',
-                              value: '${_products.where((p) => p.b2bReady).length}',
+                              value:
+                                  '${_products.where((p) => p.b2bReady).length}',
                               icon: Icons.business_rounded,
                               color: AppColors.secondary,
                             ),
@@ -203,16 +228,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
             sliver: SliverToBoxAdapter(
               child: Row(
                 children: [
-                  const Text(
+                  const AppText(
                     'मेरे उत्पाद',
-                    style: TextStyle(fontFamily: 'Poppins', fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                    style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary),
                   ),
                   const SizedBox(width: 6),
-                  const Text('My Products', style: TextStyle(fontFamily: 'Poppins', fontSize: 12, color: AppColors.textHint)),
                   const Spacer(),
                   TextButton(
                     onPressed: () {},
-                    child: const Text('सभी देखें', style: TextStyle(fontFamily: 'Poppins', fontSize: 13, color: AppColors.primary)),
+                    child: const AppText('सभी देखें',
+                        style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 13,
+                            color: AppColors.primary)),
                   ),
                 ],
               ),
@@ -246,7 +278,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       colors: [Color(0xFF1A1040), Color(0xFF0D1040)],
                     ),
                     borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: AppColors.secondary.withOpacity(0.3)),
+                    border:
+                        Border.all(color: AppColors.secondary.withOpacity(0.3)),
                   ),
                   child: Row(
                     children: [
@@ -255,23 +288,40 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         height: 52,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          gradient: const LinearGradient(colors: [AppColors.secondary, Color(0xFF8A84FF)]),
-                          boxShadow: [BoxShadow(color: AppColors.secondary.withOpacity(0.3), blurRadius: 12)],
+                          gradient: const LinearGradient(
+                              colors: [AppColors.secondary, Color(0xFF8A84FF)]),
+                          boxShadow: [
+                            BoxShadow(
+                                color: AppColors.secondary.withOpacity(0.3),
+                                blurRadius: 12)
+                          ],
                         ),
-                        child: const Icon(Icons.business_rounded, color: Colors.white, size: 26),
+                        child: const Icon(Icons.business_rounded,
+                            color: Colors.white, size: 26),
                       ),
                       const SizedBox(width: 16),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('B2B / सरकारी बाज़ार', style: TextStyle(fontFamily: 'Poppins', fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                            const AppText('B2B / सरकारी बाज़ार',
+                                style: TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.textPrimary)),
                             const SizedBox(height: 2),
-                            const Text('GeM · ONDC · State Boards तक पहुँचें', style: TextStyle(fontFamily: 'Poppins', fontSize: 12, color: AppColors.textSecondary)),
+                            const AppText(
+                                'GeM · ONDC · State Boards तक पहुँचें',
+                                style: TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontSize: 12,
+                                    color: AppColors.textSecondary)),
                           ],
                         ),
                       ),
-                      const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.secondary, size: 16),
+                      const Icon(Icons.arrow_forward_ios_rounded,
+                          color: AppColors.secondary, size: 16),
                     ],
                   ),
                 ),
@@ -290,15 +340,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
             label: Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(colors: [AppColors.primary, AppColors.secondary]),
+                gradient: const LinearGradient(
+                    colors: [AppColors.primary, AppColors.secondary]),
                 borderRadius: BorderRadius.circular(30),
-                boxShadow: [BoxShadow(color: AppColors.primary.withOpacity(0.4), blurRadius: 20, offset: const Offset(0, 6))],
+                boxShadow: [
+                  BoxShadow(
+                      color: AppColors.primary.withOpacity(0.4),
+                      blurRadius: 20,
+                      offset: const Offset(0, 6))
+                ],
               ),
               child: const Row(
                 children: [
-                  Icon(Icons.add_a_photo_rounded, color: Colors.white, size: 20),
+                  Icon(Icons.add_a_photo_rounded,
+                      color: Colors.white, size: 20),
                   SizedBox(width: 8),
-                  Text('नया उत्पाद जोड़ें', style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600, color: Colors.white, fontSize: 14)),
+                  AppText('नया उत्पाद जोड़ें',
+                      style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                          fontSize: 14)),
                 ],
               ),
             ),
@@ -342,11 +404,19 @@ class _StatCard extends StatelessWidget {
           children: [
             Icon(icon, color: color, size: 20),
             const SizedBox(height: 4),
-            Text(
+            AppText(
               value,
-              style: TextStyle(fontFamily: 'Poppins', fontSize: 20, fontWeight: FontWeight.w700, color: color),
+              style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: color),
             ),
-            Text(label, style: const TextStyle(fontFamily: 'Poppins', fontSize: 10, color: AppColors.textHint)),
+            AppText(label,
+                style: const TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 10,
+                    color: AppColors.textHint)),
           ],
         ),
       ),
@@ -407,7 +477,8 @@ class _ProductCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Center(
-                child: Text(product.imageEmoji, style: const TextStyle(fontSize: 36)),
+                child: AppText(product.imageEmoji,
+                    style: const TextStyle(fontSize: 36)),
               ),
             ),
             const SizedBox(width: 14),
@@ -415,28 +486,36 @@ class _ProductCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                  AppText(
                     product.name,
-                    style: const TextStyle(fontFamily: 'Poppins', fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-                  ),
-                  Text(
-                    product.nameEn,
-                    style: const TextStyle(fontFamily: 'Poppins', fontSize: 11, color: AppColors.textHint),
+                    style: const TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary),
                   ),
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      VerificationStatusChip(status: product.verificationStatus),
+                      VerificationStatusChip(
+                          status: product.verificationStatus),
                       const SizedBox(width: 6),
                       if (product.b2bReady)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
                             color: AppColors.secondary.withOpacity(0.15),
                             borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: AppColors.secondary.withOpacity(0.3)),
+                            border: Border.all(
+                                color: AppColors.secondary.withOpacity(0.3)),
                           ),
-                          child: const Text('B2B', style: TextStyle(fontFamily: 'Poppins', fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.secondary)),
+                          child: const AppText('B2B',
+                              style: TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.secondary)),
                         ),
                     ],
                   ),
@@ -447,12 +526,17 @@ class _ProductCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 if (product.price != null)
-                  Text(
+                  AppText(
                     '₹${product.price!.toStringAsFixed(0)}',
-                    style: const TextStyle(fontFamily: 'Poppins', fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.accent),
+                    style: const TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.accent),
                   ),
                 const SizedBox(height: 6),
-                const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.textHint, size: 14),
+                const Icon(Icons.arrow_forward_ios_rounded,
+                    color: AppColors.textHint, size: 14),
               ],
             ),
           ],

@@ -1,3 +1,4 @@
+import '../../core/localization/app_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -27,7 +28,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     final phone = _phoneController.text.trim();
     if (phone.length < 10) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Valid phone number required')),
+        const SnackBar(content: AppText('Valid phone number required')),
       );
       return;
     }
@@ -61,10 +62,11 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                     colors: [AppColors.primary, AppColors.secondary],
                   ),
                 ),
-                child: const Icon(Icons.handshake_rounded, color: Colors.white, size: 32),
+                child: const Icon(Icons.handshake_rounded,
+                    color: Colors.white, size: 32),
               ),
               const SizedBox(height: 28),
-              const Text(
+              const AppText(
                 'नमस्ते! 👋',
                 style: TextStyle(
                   fontFamily: 'Poppins',
@@ -74,20 +76,12 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                 ),
               ),
               const SizedBox(height: 6),
-              const Text(
+              const AppText(
                 'अपना मोबाइल नंबर दर्ज करें',
                 style: TextStyle(
                   fontFamily: 'Poppins',
                   fontSize: 16,
                   color: AppColors.textSecondary,
-                ),
-              ),
-              const Text(
-                'Enter your mobile number',
-                style: TextStyle(
-                  fontFamily: 'Poppins',
-                  fontSize: 13,
-                  color: AppColors.textHint,
                 ),
               ),
               const SizedBox(height: 40),
@@ -102,7 +96,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                   children: [
                     // Country code selector
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 18),
                       decoration: BoxDecoration(
                         border: Border(
                           right: BorderSide(color: AppColors.glassBorder),
@@ -110,9 +105,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                       ),
                       child: Row(
                         children: [
-                          const Text('🇮🇳', style: TextStyle(fontSize: 20)),
+                          const AppText('🇮🇳', style: TextStyle(fontSize: 20)),
                           const SizedBox(width: 6),
-                          const Text(
+                          const AppText(
                             '+91',
                             style: TextStyle(
                               fontFamily: 'Poppins',
@@ -132,7 +127,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                       child: TextField(
                         controller: _phoneController,
                         keyboardType: TextInputType.phone,
-                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly
+                        ],
                         maxLength: 10,
                         style: const TextStyle(
                           fontFamily: 'Poppins',
@@ -159,7 +156,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-              Text(
+              AppText(
                 'OTP आपके नंबर पर भेजा जाएगा  •  OTP will be sent to this number',
                 style: TextStyle(
                   fontFamily: 'Poppins',
@@ -197,7 +194,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                               strokeWidth: 2.5,
                             ),
                           )
-                        : const Text(
+                        : const AppText(
                             'OTP भेजें  →',
                             style: TextStyle(
                               fontFamily: 'Poppins',
@@ -216,7 +213,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                   Expanded(child: Divider(color: AppColors.divider)),
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 12),
-                    child: Text(
+                    child: AppText(
                       'या / or',
                       style: TextStyle(
                         fontFamily: 'Poppins',
@@ -245,14 +242,14 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                     borderRadius: BorderRadius.circular(14),
                   ),
                 ),
-                child: const Text(
+                child: const AppText(
                   '🎭  Demo Mode (Judges)',
                   style: TextStyle(fontFamily: 'Poppins', fontSize: 14),
                 ),
               ),
               const SizedBox(height: 32),
               Center(
-                child: Text(
+                child: AppText(
                   'By continuing, you agree to our Terms & Privacy Policy',
                   textAlign: TextAlign.center,
                   style: TextStyle(

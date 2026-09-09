@@ -5,7 +5,7 @@ from typing import Optional
 
 class Settings(BaseSettings):
     # App
-    APP_NAME: str = "CraftConnect API"
+    APP_NAME: str = "Aakar API"
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
 

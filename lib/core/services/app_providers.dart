@@ -5,8 +5,14 @@ import '../../shared/models/models.dart';
 // Selected language provider
 final selectedLanguageProvider = StateProvider<String>((ref) => 'hi');
 
+Future<String> loadSelectedLanguage() async {
+  final prefs = await SharedPreferences.getInstance();
+  return prefs.getString('selected_language') == 'en' ? 'en' : 'hi';
+}
+
 // Auth state provider
-final authStateProvider = StateProvider<AuthState>((ref) => AuthState.unauthenticated);
+final authStateProvider =
+    StateProvider<AuthState>((ref) => AuthState.unauthenticated);
 
 enum AuthState { unauthenticated, authenticating, authenticated }
 

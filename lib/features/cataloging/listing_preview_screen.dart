@@ -1,3 +1,4 @@
+import '../../core/localization/app_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
@@ -20,7 +21,7 @@ class _ListingPreviewScreenState extends State<ListingPreviewScreen>
   bool _loading = true;
   bool _readingBack = false;
   bool _approved = false;
-  bool _showHindi = true;
+  bool _localeInitialized = false;
   late TabController _tabController;
 
   @override
@@ -31,6 +32,15 @@ class _ListingPreviewScreenState extends State<ListingPreviewScreen>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_localeInitialized) {
+      _tabController.index = context.isHindi ? 0 : 1;
+      _localeInitialized = true;
+    }
+  }
+
+  @override
   void dispose() {
     _tabController.dispose();
     super.dispose();
@@ -38,8 +48,13 @@ class _ListingPreviewScreenState extends State<ListingPreviewScreen>
 
   Future<void> _generateListing() async {
     setState(() => _loading = true);
-    final listing = await MockAIService.generateListing(widget.productId, [], 'Kalakar');
-    if (mounted) setState(() { _listing = listing; _loading = false; });
+    final listing =
+        await MockAIService.generateListing(widget.productId, [], 'Kalakar');
+    if (mounted)
+      setState(() {
+        _listing = listing;
+        _loading = false;
+      });
   }
 
   Future<void> _readBack() async {
@@ -58,13 +73,15 @@ class _ListingPreviewScreenState extends State<ListingPreviewScreen>
           icon: const Icon(Icons.arrow_back_ios_rounded),
           onPressed: () => context.pop(),
         ),
-        title: const Text('Listing Preview'),
+        title: const AppText('Listing Preview'),
         actions: [
           if (_listing != null)
             Padding(
               padding: const EdgeInsets.only(right: 12),
               child: VerificationStatusChip(
-                status: _approved ? VerificationStatus.approved : _listing!.verificationStatus,
+                status: _approved
+                    ? VerificationStatus.approved
+                    : _listing!.verificationStatus,
               ),
             ),
         ],
@@ -73,7 +90,8 @@ class _ListingPreviewScreenState extends State<ListingPreviewScreen>
           indicatorColor: AppColors.primary,
           labelColor: AppColors.primary,
           unselectedLabelColor: AppColors.textHint,
-          labelStyle: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600, fontSize: 13),
+          labelStyle: const TextStyle(
+              fontFamily: 'Poppins', fontWeight: FontWeight.w600, fontSize: 13),
           tabs: const [Tab(text: 'हिंदी'), Tab(text: 'English')],
         ),
       ),
@@ -87,17 +105,36 @@ class _ListingPreviewScreenState extends State<ListingPreviewScreen>
                     height: 80,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      gradient: const LinearGradient(colors: [AppColors.primary, AppColors.secondary]),
-                      boxShadow: [BoxShadow(color: AppColors.primary.withOpacity(0.4), blurRadius: 24)],
+                      gradient: const LinearGradient(
+                          colors: [AppColors.primary, AppColors.secondary]),
+                      boxShadow: [
+                        BoxShadow(
+                            color: AppColors.primary.withOpacity(0.4),
+                            blurRadius: 24)
+                      ],
                     ),
-                    child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 38),
+                    child: const Icon(Icons.auto_awesome_rounded,
+                        color: Colors.white, size: 38),
                   ),
                   const SizedBox(height: 20),
-                  const Text('Listing तैयार हो रही है...', style: TextStyle(fontFamily: 'Poppins', fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                  const AppText('Listing तैयार हो रही है...',
+                      style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary)),
                   const SizedBox(height: 8),
-                  const Text('Generating bilingual listing...', style: TextStyle(fontFamily: 'Poppins', fontSize: 12, color: AppColors.textHint)),
+                  const AppText('Generating bilingual listing...',
+                      style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 12,
+                          color: AppColors.textHint)),
                   const SizedBox(height: 20),
-                  const SizedBox(width: 200, child: LinearProgressIndicator(color: AppColors.primary, backgroundColor: AppColors.surface)),
+                  const SizedBox(
+                      width: 200,
+                      child: LinearProgressIndicator(
+                          color: AppColors.primary,
+                          backgroundColor: AppColors.surface)),
                 ],
               ),
             )
@@ -116,23 +153,32 @@ class _ListingPreviewScreenState extends State<ListingPreviewScreen>
                         style: OutlinedButton.styleFrom(
                           minimumSize: const Size(double.infinity, 48),
                           side: const BorderSide(color: AppColors.glassBorder),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14)),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(
-                              _readingBack ? Icons.volume_up_rounded : Icons.volume_up_outlined,
-                              color: _readingBack ? AppColors.primary : AppColors.textSecondary,
+                              _readingBack
+                                  ? Icons.volume_up_rounded
+                                  : Icons.volume_up_outlined,
+                              color: _readingBack
+                                  ? AppColors.primary
+                                  : AppColors.textSecondary,
                               size: 20,
                             ),
                             const SizedBox(width: 8),
-                            Text(
-                              _readingBack ? 'पढ़ा जा रहा है...' : '🔊 सुनें — Read Back',
+                            AppText(
+                              _readingBack
+                                  ? 'पढ़ा जा रहा है...'
+                                  : '🔊 सुनें — Read Back',
                               style: TextStyle(
                                 fontFamily: 'Poppins',
                                 fontSize: 13,
-                                color: _readingBack ? AppColors.primary : AppColors.textSecondary,
+                                color: _readingBack
+                                    ? AppColors.primary
+                                    : AppColors.textSecondary,
                               ),
                             ),
                           ],
@@ -147,15 +193,22 @@ class _ListingPreviewScreenState extends State<ListingPreviewScreen>
                               onPressed: () {
                                 // Edit mode — for demo, just show a snackbar
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Edit mode coming soon!')),
+                                  const SnackBar(
+                                      content:
+                                          AppText('Edit mode coming soon!')),
                                 );
                               },
                               style: OutlinedButton.styleFrom(
                                 minimumSize: const Size(0, 52),
-                                side: const BorderSide(color: AppColors.glassBorder),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                side: const BorderSide(
+                                    color: AppColors.glassBorder),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14)),
                               ),
-                              child: const Text('✏️ संपादित', style: TextStyle(fontFamily: 'Poppins', color: AppColors.textSecondary)),
+                              child: const AppText('✏️ संपादित',
+                                  style: TextStyle(
+                                      fontFamily: 'Poppins',
+                                      color: AppColors.textSecondary)),
                             ),
                           ),
                         if (!_approved) const SizedBox(width: 12),
@@ -163,29 +216,45 @@ class _ListingPreviewScreenState extends State<ListingPreviewScreen>
                           flex: 2,
                           child: GestureDetector(
                             onTap: _approved
-                                ? () => context.push('/pricing', extra: widget.productId)
+                                ? () => context.push('/pricing',
+                                    extra: widget.productId)
                                 : () => setState(() => _approved = true),
                             child: Container(
                               height: 52,
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
                                   colors: _approved
-                                      ? [AppColors.accentGreen, const Color(0xFF059669)]
-                                      : [AppColors.primary, AppColors.secondary],
+                                      ? [
+                                          AppColors.accentGreen,
+                                          const Color(0xFF059669)
+                                        ]
+                                      : [
+                                          AppColors.primary,
+                                          AppColors.secondary
+                                        ],
                                 ),
                                 borderRadius: BorderRadius.circular(14),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: (_approved ? AppColors.accentGreen : AppColors.primary).withOpacity(0.35),
+                                    color: (_approved
+                                            ? AppColors.accentGreen
+                                            : AppColors.primary)
+                                        .withOpacity(0.35),
                                     blurRadius: 16,
                                     offset: const Offset(0, 6),
                                   ),
                                 ],
                               ),
                               child: Center(
-                                child: Text(
-                                  _approved ? '✓ Approved! Price Set करें →' : '✅ हाँ, सही है! Approve',
-                                  style: const TextStyle(fontFamily: 'Poppins', fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white),
+                                child: AppText(
+                                  _approved
+                                      ? '✓ Approved! Price Set करें →'
+                                      : '✅ हाँ, सही है! Approve',
+                                  style: const TextStyle(
+                                      fontFamily: 'Poppins',
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white),
                                 ),
                               ),
                             ),
@@ -223,15 +292,20 @@ class _ListingPreviewScreenState extends State<ListingPreviewScreen>
           decoration: BoxDecoration(
             color: AppColors.statusGenerated.withOpacity(0.1),
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: AppColors.statusGenerated.withOpacity(0.25)),
+            border:
+                Border.all(color: AppColors.statusGenerated.withOpacity(0.25)),
           ),
           child: const Row(
             children: [
-              Icon(Icons.auto_awesome_rounded, color: AppColors.statusGenerated, size: 16),
+              Icon(Icons.auto_awesome_rounded,
+                  color: AppColors.statusGenerated, size: 16),
               SizedBox(width: 8),
-              Text(
+              AppText(
                 'AI द्वारा तैयार — कृपया जाँचें  |  AI-generated — please verify',
-                style: TextStyle(fontFamily: 'Poppins', fontSize: 11, color: AppColors.statusGenerated),
+                style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 11,
+                    color: AppColors.statusGenerated),
               ),
             ],
           ),
@@ -242,9 +316,19 @@ class _ListingPreviewScreenState extends State<ListingPreviewScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('शीर्षक / Title', style: TextStyle(fontFamily: 'Poppins', fontSize: 11, color: AppColors.textHint)),
+              const AppText('शीर्षक / Title',
+                  style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 11,
+                      color: AppColors.textHint)),
               const SizedBox(height: 6),
-              Text(title, style: const TextStyle(fontFamily: 'Poppins', fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary, height: 1.4)),
+              Text(title,
+                  style: const TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                      height: 1.4)),
             ],
           ),
         ),
@@ -254,9 +338,18 @@ class _ListingPreviewScreenState extends State<ListingPreviewScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('विवरण / Description', style: TextStyle(fontFamily: 'Poppins', fontSize: 11, color: AppColors.textHint)),
+              const AppText('विवरण / Description',
+                  style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 11,
+                      color: AppColors.textHint)),
               const SizedBox(height: 6),
-              Text(desc, style: const TextStyle(fontFamily: 'Poppins', fontSize: 13, color: AppColors.textSecondary, height: 1.6)),
+              Text(desc,
+                  style: const TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 13,
+                      color: AppColors.textSecondary,
+                      height: 1.6)),
             ],
           ),
         ),
@@ -266,20 +359,33 @@ class _ListingPreviewScreenState extends State<ListingPreviewScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Tags / Keywords', style: TextStyle(fontFamily: 'Poppins', fontSize: 11, color: AppColors.textHint)),
+              const AppText('Tags / Keywords',
+                  style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 11,
+                      color: AppColors.textHint)),
               const SizedBox(height: 10),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
-                children: l.tags.map((tag) => Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColors.primary.withOpacity(0.25)),
-                  ),
-                  child: Text('#$tag', style: const TextStyle(fontFamily: 'Poppins', fontSize: 11, fontWeight: FontWeight.w500, color: AppColors.primary)),
-                )).toList(),
+                children: l.tags
+                    .map((tag) => Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                                color: AppColors.primary.withOpacity(0.25)),
+                          ),
+                          child: AppText('#$tag',
+                              style: const TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                  color: AppColors.primary)),
+                        ))
+                    .toList(),
               ),
             ],
           ),
@@ -296,12 +402,16 @@ class _ListingPreviewScreenState extends State<ListingPreviewScreen>
           child: const Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('🎨', style: TextStyle(fontSize: 16)),
+              AppText('🎨', style: TextStyle(fontSize: 16)),
               SizedBox(width: 10),
               Expanded(
-                child: Text(
+                child: AppText(
                   '"Matka" और "Terracotta" जैसे शिल्प-शब्द संरक्षित हैं\nCraft terms like "Matka" & "Terracotta" preserved verbatim',
-                  style: TextStyle(fontFamily: 'Poppins', fontSize: 11, color: AppColors.accent, height: 1.5),
+                  style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 11,
+                      color: AppColors.accent,
+                      height: 1.5),
                 ),
               ),
             ],

@@ -1,4 +1,4 @@
-# CraftConnect 🎨
+# Aakar 🎨
 ### AI-Driven Market Linkage & Smart Cataloging for Marginalized Artisans
 **SIH 2026 · PS 26090 · Ministry of Social Justice and Empowerment (MoSJE)**
 

@@ -1,4 +1,4 @@
-/// Core data models for CraftConnect
+/// Core data models for Aakar
 
 enum VerificationStatus { aiGenerated, artisanReviewed, approved, rejected }
 

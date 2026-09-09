@@ -1,3 +1,4 @@
+import '../../core/localization/app_strings.dart';
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../shared/models/models.dart';
@@ -37,7 +38,7 @@ class VerificationStatusChip extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 4),
-          Text(
+          AppText(
             compact ? config.shortLabel : config.label,
             style: TextStyle(
               fontFamily: 'Poppins',

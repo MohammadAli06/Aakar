@@ -1,3 +1,4 @@
+import '../../core/localization/app_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:go_router/go_router.dart';
@@ -19,7 +20,11 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen>
 
   // Live guidance tips
   static const _tips = [
-    {'icon': '☀️', 'hi': 'अच्छी रोशनी में फोटो लें', 'en': 'Take in good lighting'},
+    {
+      'icon': '☀️',
+      'hi': 'अच्छी रोशनी में फोटो लें',
+      'en': 'Take in good lighting'
+    },
     {'icon': '📐', 'hi': 'उत्पाद को बीच में रखें', 'en': 'Center the product'},
     {'icon': '🔍', 'hi': 'क्लियर फोकस रखें', 'en': 'Keep it in focus'},
     {'icon': '📏', 'hi': '30-50 cm दूरी से', 'en': '30-50 cm distance'},
@@ -55,7 +60,7 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen>
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Camera error: $e')),
+          SnackBar(content: AppText('${context.tr('Camera error')}: $e')),
         );
       }
     } finally {
@@ -72,7 +77,7 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen>
           icon: const Icon(Icons.arrow_back_ios_rounded),
           onPressed: () => context.pop(),
         ),
-        title: const Text('फोटो कैप्चर'),
+        title: const AppText('फोटो कैप्चर'),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -113,10 +118,16 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen>
                           height: 2,
                           decoration: BoxDecoration(
                             gradient: const LinearGradient(
-                              colors: [Colors.transparent, AppColors.primary, Colors.transparent],
+                              colors: [
+                                Colors.transparent,
+                                AppColors.primary,
+                                Colors.transparent
+                              ],
                             ),
                             boxShadow: [
-                              BoxShadow(color: AppColors.primary.withOpacity(0.5), blurRadius: 6),
+                              BoxShadow(
+                                  color: AppColors.primary.withOpacity(0.5),
+                                  blurRadius: 6),
                             ],
                           ),
                         ),
@@ -128,9 +139,10 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen>
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(Icons.camera_alt_outlined,
-                              size: 48, color: AppColors.primary.withOpacity(0.5)),
+                              size: 48,
+                              color: AppColors.primary.withOpacity(0.5)),
                           const SizedBox(height: 8),
-                          const Text(
+                          const AppText(
                             'यहाँ उत्पाद दिखेगा',
                             style: TextStyle(
                               fontFamily: 'Poppins',
@@ -146,9 +158,13 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen>
               ),
               const SizedBox(height: 20),
               // Tips
-              const Text(
+              const AppText(
                 '📋 बेहतर फोटो के लिए',
-                style: TextStyle(fontFamily: 'Poppins', fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary),
               ),
               const SizedBox(height: 10),
               GridView.count(
@@ -158,51 +174,78 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen>
                 crossAxisSpacing: 10,
                 mainAxisSpacing: 10,
                 childAspectRatio: 2.8,
-                children: _tips.map((t) => Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.glassBorder),
-                  ),
-                  child: Row(
-                    children: [
-                      Text(t['icon']!, style: const TextStyle(fontSize: 16)),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(t['hi']!, style: const TextStyle(fontFamily: 'Poppins', fontSize: 10, fontWeight: FontWeight.w500, color: AppColors.textPrimary), maxLines: 1, overflow: TextOverflow.ellipsis),
-                            Text(t['en']!, style: const TextStyle(fontFamily: 'Poppins', fontSize: 9, color: AppColors.textHint), maxLines: 1, overflow: TextOverflow.ellipsis),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                )).toList(),
+                children: _tips
+                    .map((t) => Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: AppColors.surface,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppColors.glassBorder),
+                          ),
+                          child: Row(
+                            children: [
+                              AppText(t['icon']!,
+                                  style: const TextStyle(fontSize: 16)),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    AppText(t['hi']!,
+                                        style: const TextStyle(
+                                            fontFamily: 'Poppins',
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w500,
+                                            color: AppColors.textPrimary),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ))
+                    .toList(),
               ),
               const SizedBox(height: 24),
               // Action buttons
               GestureDetector(
-                onTap: _capturing ? null : () => _captureImage(ImageSource.camera),
+                onTap:
+                    _capturing ? null : () => _captureImage(ImageSource.camera),
                 child: Container(
                   height: 60,
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(colors: [AppColors.primary, AppColors.secondary]),
+                    gradient: const LinearGradient(
+                        colors: [AppColors.primary, AppColors.secondary]),
                     borderRadius: BorderRadius.circular(18),
-                    boxShadow: [BoxShadow(color: AppColors.primary.withOpacity(0.4), blurRadius: 20, offset: const Offset(0, 8))],
+                    boxShadow: [
+                      BoxShadow(
+                          color: AppColors.primary.withOpacity(0.4),
+                          blurRadius: 20,
+                          offset: const Offset(0, 8))
+                    ],
                   ),
                   child: Center(
                     child: _capturing
-                        ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
+                        ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                                color: Colors.white, strokeWidth: 2.5))
                         : const Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.camera_alt_rounded, color: Colors.white, size: 22),
+                              Icon(Icons.camera_alt_rounded,
+                                  color: Colors.white, size: 22),
                               SizedBox(width: 10),
-                              Text('कैमरा खोलें  •  Open Camera', style: TextStyle(fontFamily: 'Poppins', fontSize: 15, fontWeight: FontWeight.w600, color: Colors.white)),
+                              AppText('कैमरा खोलें  •  Open Camera',
+                                  style: TextStyle(
+                                      fontFamily: 'Poppins',
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white)),
                             ],
                           ),
                   ),
@@ -210,18 +253,27 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen>
               ),
               const SizedBox(height: 12),
               OutlinedButton(
-                onPressed: _capturing ? null : () => _captureImage(ImageSource.gallery),
+                onPressed: _capturing
+                    ? null
+                    : () => _captureImage(ImageSource.gallery),
                 style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: AppColors.glassBorder, width: 1.5),
+                  side: const BorderSide(
+                      color: AppColors.glassBorder, width: 1.5),
                   minimumSize: const Size(double.infinity, 56),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16)),
                 ),
                 child: const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.photo_library_rounded, color: AppColors.textSecondary),
+                    Icon(Icons.photo_library_rounded,
+                        color: AppColors.textSecondary),
                     SizedBox(width: 8),
-                    Text('गैलरी से चुनें  •  Choose from Gallery', style: TextStyle(fontFamily: 'Poppins', fontSize: 14, color: AppColors.textSecondary)),
+                    AppText('गैलरी से चुनें  •  Choose from Gallery',
+                        style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 14,
+                            color: AppColors.textSecondary)),
                   ],
                 ),
               ),
@@ -239,13 +291,45 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen>
     const color = AppColors.primary;
     return [
       // Top-left
-      Positioned(top: 16, left: 16, child: _Corner(size: size, thickness: thickness, color: color, isTop: true, isLeft: true)),
+      Positioned(
+          top: 16,
+          left: 16,
+          child: _Corner(
+              size: size,
+              thickness: thickness,
+              color: color,
+              isTop: true,
+              isLeft: true)),
       // Top-right
-      Positioned(top: 16, right: 16, child: _Corner(size: size, thickness: thickness, color: color, isTop: true, isLeft: false)),
+      Positioned(
+          top: 16,
+          right: 16,
+          child: _Corner(
+              size: size,
+              thickness: thickness,
+              color: color,
+              isTop: true,
+              isLeft: false)),
       // Bottom-left
-      Positioned(bottom: 16, left: 16, child: _Corner(size: size, thickness: thickness, color: color, isTop: false, isLeft: true)),
+      Positioned(
+          bottom: 16,
+          left: 16,
+          child: _Corner(
+              size: size,
+              thickness: thickness,
+              color: color,
+              isTop: false,
+              isLeft: true)),
       // Bottom-right
-      Positioned(bottom: 16, right: 16, child: _Corner(size: size, thickness: thickness, color: color, isTop: false, isLeft: false)),
+      Positioned(
+          bottom: 16,
+          right: 16,
+          child: _Corner(
+              size: size,
+              thickness: thickness,
+              color: color,
+              isTop: false,
+              isLeft: false)),
     ];
   }
 }
@@ -256,7 +340,12 @@ class _Corner extends StatelessWidget {
   final Color color;
   final bool isTop;
   final bool isLeft;
-  const _Corner({required this.size, required this.thickness, required this.color, required this.isTop, required this.isLeft});
+  const _Corner(
+      {required this.size,
+      required this.thickness,
+      required this.color,
+      required this.isTop,
+      required this.isLeft});
 
   @override
   Widget build(BuildContext context) {
@@ -264,7 +353,8 @@ class _Corner extends StatelessWidget {
       width: size,
       height: size,
       child: CustomPaint(
-        painter: _CornerPainter(color: color, thickness: thickness, isTop: isTop, isLeft: isLeft),
+        painter: _CornerPainter(
+            color: color, thickness: thickness, isTop: isTop, isLeft: isLeft),
       ),
     );
   }
@@ -276,7 +366,11 @@ class _CornerPainter extends CustomPainter {
   final bool isTop;
   final bool isLeft;
 
-  const _CornerPainter({required this.color, required this.thickness, required this.isTop, required this.isLeft});
+  const _CornerPainter(
+      {required this.color,
+      required this.thickness,
+      required this.isTop,
+      required this.isLeft});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -311,10 +405,14 @@ class _GridPainter extends CustomPainter {
     final paint = Paint()
       ..color = AppColors.glassBorder.withOpacity(0.3)
       ..strokeWidth = 0.5;
-    canvas.drawLine(Offset(size.width / 3, 0), Offset(size.width / 3, size.height), paint);
-    canvas.drawLine(Offset(size.width * 2 / 3, 0), Offset(size.width * 2 / 3, size.height), paint);
-    canvas.drawLine(Offset(0, size.height / 3), Offset(size.width, size.height / 3), paint);
-    canvas.drawLine(Offset(0, size.height * 2 / 3), Offset(size.width, size.height * 2 / 3), paint);
+    canvas.drawLine(
+        Offset(size.width / 3, 0), Offset(size.width / 3, size.height), paint);
+    canvas.drawLine(Offset(size.width * 2 / 3, 0),
+        Offset(size.width * 2 / 3, size.height), paint);
+    canvas.drawLine(
+        Offset(0, size.height / 3), Offset(size.width, size.height / 3), paint);
+    canvas.drawLine(Offset(0, size.height * 2 / 3),
+        Offset(size.width, size.height * 2 / 3), paint);
   }
 
   @override

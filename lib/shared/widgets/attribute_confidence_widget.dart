@@ -1,3 +1,4 @@
+import '../../core/localization/app_strings.dart';
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../shared/models/models.dart';
@@ -52,7 +53,7 @@ class AttributeConfidenceWidget extends StatelessWidget {
               border: Border.all(color: _confidenceColor.withOpacity(0.3)),
             ),
             child: Center(
-              child: Text(
+              child: AppText(
                 hasValue ? '${(field.confidence * 100).toInt()}%' : '?',
                 style: TextStyle(
                   fontFamily: 'Poppins',
@@ -71,7 +72,7 @@ class AttributeConfidenceWidget extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Text(
+                    AppText(
                       field.labelHi,
                       style: const TextStyle(
                         fontFamily: 'Poppins',
@@ -80,17 +81,9 @@ class AttributeConfidenceWidget extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 4),
-                    Text(
-                      '· ${field.labelEn}',
-                      style: const TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 10,
-                        color: AppColors.textHint,
-                      ),
-                    ),
                     if (field.isRequired) ...[
                       const SizedBox(width: 4),
-                      const Text(
+                      const AppText(
                         '*',
                         style: TextStyle(
                           color: AppColors.accentRed,
@@ -103,7 +96,7 @@ class AttributeConfidenceWidget extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 hasValue
-                    ? Text(
+                    ? AppText(
                         field.value!,
                         style: const TextStyle(
                           fontFamily: 'Poppins',
@@ -121,7 +114,7 @@ class AttributeConfidenceWidget extends StatelessWidget {
                           border: Border.all(
                               color: AppColors.accentRed.withOpacity(0.3)),
                         ),
-                        child: const Text(
+                        child: const AppText(
                           'ℹ️  जानकारी चाहिए · Missing',
                           style: TextStyle(
                             fontFamily: 'Poppins',

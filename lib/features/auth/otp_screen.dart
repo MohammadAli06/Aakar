@@ -1,3 +1,4 @@
+import '../../core/localization/app_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pinput/pinput.dart';
@@ -93,7 +94,7 @@ class _OtpScreenState extends State<OtpScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 20),
-              const Text(
+              const AppText(
                 'OTP दर्ज करें',
                 style: TextStyle(
                   fontFamily: 'Poppins',
@@ -111,7 +112,7 @@ class _OtpScreenState extends State<OtpScreen> {
                     color: AppColors.textSecondary,
                   ),
                   children: [
-                    const TextSpan(text: 'OTP sent to '),
+                    TextSpan(text: context.tr('OTP sent to ')),
                     TextSpan(
                       text: widget.phoneNumber,
                       style: const TextStyle(
@@ -152,9 +153,7 @@ class _OtpScreenState extends State<OtpScreen> {
               const SizedBox(height: 40),
               // Verify button
               GestureDetector(
-                onTap: _loading
-                    ? null
-                    : () => _verifyOtp(_otpController.text),
+                onTap: _loading ? null : () => _verifyOtp(_otpController.text),
                 child: Container(
                   height: 56,
                   decoration: BoxDecoration(
@@ -180,7 +179,7 @@ class _OtpScreenState extends State<OtpScreen> {
                               strokeWidth: 2.5,
                             ),
                           )
-                        : const Text(
+                        : const AppText(
                             'Verify & Continue',
                             style: TextStyle(
                               fontFamily: 'Poppins',
@@ -203,13 +202,15 @@ class _OtpScreenState extends State<OtpScreen> {
                           });
                           _startResendTimer();
                         },
-                        child: const Text(
+                        child: const AppText(
                           'Resend OTP',
                           style: TextStyle(color: AppColors.primary),
                         ),
                       )
-                    : Text(
-                        'Resend OTP in $_resendSeconds s',
+                    : AppText(
+                        context.isHindi
+                            ? '$_resendSeconds सेकंड में OTP दोबारा भेजें'
+                            : 'Resend OTP in $_resendSeconds s',
                         style: const TextStyle(
                           fontFamily: 'Poppins',
                           color: AppColors.textHint,
@@ -221,13 +222,14 @@ class _OtpScreenState extends State<OtpScreen> {
               // Demo hint
               Center(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
                     color: AppColors.surface,
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(color: AppColors.glassBorder),
                   ),
-                  child: const Text(
+                  child: const AppText(
                     '💡 Demo: Enter any 6 digits',
                     style: TextStyle(
                       fontFamily: 'Poppins',

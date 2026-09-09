@@ -1,3 +1,4 @@
+import '../../core/localization/app_strings.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -83,8 +84,10 @@ class _EnhancementScreenState extends State<EnhancementScreen>
                 onPressed: () => context.pop(),
               )
             : null,
-        title: Text(
-          _stage == _EnhancementStage.processing ? 'AI Enhancement' : 'पहले / बाद',
+        title: AppText(
+          _stage == _EnhancementStage.processing
+              ? 'AI Enhancement'
+              : 'पहले / बाद',
         ),
       ),
       body: SafeArea(
@@ -119,20 +122,21 @@ class _EnhancementScreenState extends State<EnhancementScreen>
               ],
             ),
             child: const Center(
-              child: Icon(Icons.auto_fix_high_rounded, color: Colors.white, size: 50),
+              child: Icon(Icons.auto_fix_high_rounded,
+                  color: Colors.white, size: 50),
             ),
           ),
           const SizedBox(height: 32),
-          const Text(
+          const AppText(
             'AI आपकी फोटो सुधार रहा है...',
-            style: TextStyle(fontFamily: 'Poppins', fontSize: 20, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+            style: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 4),
-          const Text(
-            'AI is enhancing your photo...',
-            style: TextStyle(fontFamily: 'Poppins', fontSize: 13, color: AppColors.textHint),
-          ),
           const SizedBox(height: 40),
           // Progress bar
           AnimatedBuilder(
@@ -149,9 +153,13 @@ class _EnhancementScreenState extends State<EnhancementScreen>
                   ),
                 ),
                 const SizedBox(height: 6),
-                Text(
+                AppText(
                   '${(_progressController.value * 100).toInt()}%',
-                  style: const TextStyle(fontFamily: 'Poppins', fontSize: 13, color: AppColors.primary, fontWeight: FontWeight.w600),
+                  style: const TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 13,
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w600),
                 ),
               ],
             ),
@@ -166,27 +174,36 @@ class _EnhancementScreenState extends State<EnhancementScreen>
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: isDone ? AppColors.accentGreen.withOpacity(0.08) : AppColors.surface,
+                color: isDone
+                    ? AppColors.accentGreen.withOpacity(0.08)
+                    : AppColors.surface,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: isDone ? AppColors.accentGreen.withOpacity(0.3) : AppColors.glassBorder),
+                border: Border.all(
+                    color: isDone
+                        ? AppColors.accentGreen.withOpacity(0.3)
+                        : AppColors.glassBorder),
               ),
               child: Row(
                 children: [
-                  Text(step['icon'] as String, style: const TextStyle(fontSize: 20)),
+                  AppText(step['icon'] as String,
+                      style: const TextStyle(fontSize: 20)),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Text(
+                    child: AppText(
                       step['label'] as String,
                       style: TextStyle(
                         fontFamily: 'Poppins',
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
-                        color: isDone ? AppColors.accentGreen : AppColors.textSecondary,
+                        color: isDone
+                            ? AppColors.accentGreen
+                            : AppColors.textSecondary,
                       ),
                     ),
                   ),
                   if (isDone)
-                    const Icon(Icons.check_circle_rounded, color: AppColors.accentGreen, size: 20)
+                    const Icon(Icons.check_circle_rounded,
+                        color: AppColors.accentGreen, size: 20)
                   else
                     const SizedBox(
                       width: 18,
@@ -220,12 +237,16 @@ class _EnhancementScreenState extends State<EnhancementScreen>
             ),
             child: const Row(
               children: [
-                Icon(Icons.auto_awesome_rounded, color: AppColors.accentGreen, size: 22),
+                Icon(Icons.auto_awesome_rounded,
+                    color: AppColors.accentGreen, size: 22),
                 SizedBox(width: 10),
                 Expanded(
-                  child: Text(
+                  child: AppText(
                     'Enhancement complete! मूल फोटो भी सेव है।',
-                    style: TextStyle(fontFamily: 'Poppins', fontSize: 12, color: AppColors.accentGreen),
+                    style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 12,
+                        color: AppColors.accentGreen),
                   ),
                 ),
               ],
@@ -271,7 +292,10 @@ class _EnhancementScreenState extends State<EnhancementScreen>
                           Container(
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
-                                colors: [AppColors.primary.withOpacity(0.05), Colors.transparent],
+                                colors: [
+                                  AppColors.primary.withOpacity(0.05),
+                                  Colors.transparent
+                                ],
                               ),
                             ),
                           ),
@@ -286,7 +310,8 @@ class _EnhancementScreenState extends State<EnhancementScreen>
                     onHorizontalDragUpdate: (d) {
                       final w = context.size?.width ?? 300;
                       setState(() {
-                        _sliderValue = (_sliderValue + d.delta.dx / w).clamp(0.0, 1.0);
+                        _sliderValue =
+                            (_sliderValue + d.delta.dx / w).clamp(0.0, 1.0);
                       });
                     },
                     child: Align(
@@ -304,7 +329,8 @@ class _EnhancementScreenState extends State<EnhancementScreen>
                               shape: BoxShape.circle,
                               color: Colors.white,
                             ),
-                            child: const Icon(Icons.compare_arrows_rounded, size: 20, color: AppColors.background),
+                            child: const Icon(Icons.compare_arrows_rounded,
+                                size: 20, color: AppColors.background),
                           ),
                         ),
                       ),
@@ -313,19 +339,36 @@ class _EnhancementScreenState extends State<EnhancementScreen>
                 ),
                 // Labels
                 Positioned(
-                  top: 12, left: 16,
+                  top: 12,
+                  left: 16,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(8)),
-                    child: const Text('पहले / Before', style: TextStyle(fontFamily: 'Poppins', fontSize: 11, color: Colors.white)),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                        color: Colors.black54,
+                        borderRadius: BorderRadius.circular(8)),
+                    child: const AppText('पहले / Before',
+                        style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 11,
+                            color: Colors.white)),
                   ),
                 ),
                 Positioned(
-                  top: 12, right: 16,
+                  top: 12,
+                  right: 16,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.8), borderRadius: BorderRadius.circular(8)),
-                    child: const Text('✨ बाद / After', style: TextStyle(fontFamily: 'Poppins', fontSize: 11, color: Colors.white, fontWeight: FontWeight.w600)),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.8),
+                        borderRadius: BorderRadius.circular(8)),
+                    child: const AppText('✨ बाद / After',
+                        style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 11,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600)),
                   ),
                 ),
               ],
@@ -333,9 +376,10 @@ class _EnhancementScreenState extends State<EnhancementScreen>
           ),
           const SizedBox(height: 16),
           // Slider hint
-          const Text(
+          const AppText(
             '← स्लाइड करें तुलना के लिए  |  Slide to compare →',
-            style: TextStyle(fontFamily: 'Poppins', fontSize: 11, color: AppColors.textHint),
+            style: TextStyle(
+                fontFamily: 'Poppins', fontSize: 11, color: AppColors.textHint),
           ),
           const SizedBox(height: 16),
           // Actions
@@ -347,9 +391,13 @@ class _EnhancementScreenState extends State<EnhancementScreen>
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size(0, 52),
                     side: const BorderSide(color: AppColors.glassBorder),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14)),
                   ),
-                  child: const Text('🔄 फिर से', style: TextStyle(fontFamily: 'Poppins', color: AppColors.textSecondary)),
+                  child: const AppText('🔄 फिर से',
+                      style: TextStyle(
+                          fontFamily: 'Poppins',
+                          color: AppColors.textSecondary)),
                 ),
               ),
               const SizedBox(width: 12),
@@ -360,9 +408,15 @@ class _EnhancementScreenState extends State<EnhancementScreen>
                   child: Container(
                     height: 52,
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(colors: [AppColors.primary, AppColors.secondary]),
+                      gradient: const LinearGradient(
+                          colors: [AppColors.primary, AppColors.secondary]),
                       borderRadius: BorderRadius.circular(14),
-                      boxShadow: [BoxShadow(color: AppColors.primary.withOpacity(0.35), blurRadius: 16, offset: const Offset(0, 6))],
+                      boxShadow: [
+                        BoxShadow(
+                            color: AppColors.primary.withOpacity(0.35),
+                            blurRadius: 16,
+                            offset: const Offset(0, 6))
+                      ],
                     ),
                     child: const Center(
                       child: Row(
@@ -370,7 +424,12 @@ class _EnhancementScreenState extends State<EnhancementScreen>
                         children: [
                           Icon(Icons.check_rounded, color: Colors.white),
                           SizedBox(width: 6),
-                          Text('सही है! आगे बढ़ें', style: TextStyle(fontFamily: 'Poppins', fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white)),
+                          AppText('सही है! आगे बढ़ें',
+                              style: TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white)),
                         ],
                       ),
                     ),
@@ -390,7 +449,8 @@ class _SliderClipper extends CustomClipper<Rect> {
   _SliderClipper(this.value);
 
   @override
-  Rect getClip(Size size) => Rect.fromLTRB(size.width * value, 0, size.width, size.height);
+  Rect getClip(Size size) =>
+      Rect.fromLTRB(size.width * value, 0, size.width, size.height);
 
   @override
   bool shouldReclip(_SliderClipper old) => old.value != value;

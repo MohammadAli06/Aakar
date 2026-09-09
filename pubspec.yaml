@@ -1,5 +1,5 @@
 name: craft_connect
-description: CraftConnect — AI-Driven Market Linkage for Marginalized Artisans (SIH 2026)
+description: Aakar — AI-Driven Market Linkage for Marginalized Artisans (SIH 2026)
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -35,10 +35,6 @@ dependencies:
   image: ^4.2.0
   photo_view: ^0.15.0
 
-  # Voice & Speech
-  speech_to_text: ^7.0.0
-  flutter_tts: ^4.0.2
-  record: ^5.1.2
 
   # UI & Animations
   google_fonts: ^6.2.1

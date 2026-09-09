@@ -1,3 +1,4 @@
+import '../../core/localization/app_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -166,8 +167,8 @@ class _SplashScreenState extends State<SplashScreen>
                       shaderCallback: (bounds) => const LinearGradient(
                         colors: [AppColors.primary, AppColors.secondary],
                       ).createShader(bounds),
-                      child: const Text(
-                        'CraftConnect',
+                      child: const AppText(
+                        'Aakar',
                         style: TextStyle(
                           fontFamily: 'Poppins',
                           fontSize: 36,
@@ -182,7 +183,7 @@ class _SplashScreenState extends State<SplashScreen>
                   // Tagline
                   FadeTransition(
                     opacity: _taglineAnimation,
-                    child: const Text(
+                    child: const AppText(
                       'हस्तकला की पहचान, डिजिटल दुनिया में',
                       style: TextStyle(
                         fontFamily: 'Poppins',
@@ -195,7 +196,7 @@ class _SplashScreenState extends State<SplashScreen>
                   const SizedBox(height: 6),
                   FadeTransition(
                     opacity: _taglineAnimation,
-                    child: const Text(
+                    child: const AppText(
                       'Artisan intelligence. Your craft, your control.',
                       style: TextStyle(
                         fontFamily: 'Poppins',
@@ -231,7 +232,7 @@ class _SplashScreenState extends State<SplashScreen>
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(color: AppColors.glassBorder),
                       ),
-                      child: const Text(
+                      child: const AppText(
                         'SIH 2026 · PS 26090 · MoSJE',
                         style: TextStyle(
                           fontFamily: 'Poppins',

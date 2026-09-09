@@ -1,3 +1,4 @@
+import '../../core/localization/app_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -19,19 +20,68 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   bool _saving = false;
 
   static const _craftCategories = [
-    {'category': CraftCategory.pottery, 'icon': '🏺', 'labelHi': 'कुम्हारी', 'labelEn': 'Pottery'},
-    {'category': CraftCategory.weaving, 'icon': '🧵', 'labelHi': 'बुनाई', 'labelEn': 'Weaving'},
-    {'category': CraftCategory.embroidery, 'icon': '🪡', 'labelHi': 'कढ़ाई', 'labelEn': 'Embroidery'},
-    {'category': CraftCategory.woodcraft, 'icon': '🪵', 'labelHi': 'लकड़ी', 'labelEn': 'Woodcraft'},
-    {'category': CraftCategory.metalcraft, 'icon': '⚙️', 'labelHi': 'धातु', 'labelEn': 'Metalcraft'},
-    {'category': CraftCategory.painting, 'icon': '🎨', 'labelHi': 'चित्रकारी', 'labelEn': 'Painting'},
-    {'category': CraftCategory.leathercraft, 'icon': '👜', 'labelHi': 'चर्म', 'labelEn': 'Leather'},
-    {'category': CraftCategory.jewelry, 'icon': '💍', 'labelHi': 'आभूषण', 'labelEn': 'Jewelry'},
+    {
+      'category': CraftCategory.pottery,
+      'icon': '🏺',
+      'labelHi': 'कुम्हारी',
+      'labelEn': 'Pottery'
+    },
+    {
+      'category': CraftCategory.weaving,
+      'icon': '🧵',
+      'labelHi': 'बुनाई',
+      'labelEn': 'Weaving'
+    },
+    {
+      'category': CraftCategory.embroidery,
+      'icon': '🪡',
+      'labelHi': 'कढ़ाई',
+      'labelEn': 'Embroidery'
+    },
+    {
+      'category': CraftCategory.woodcraft,
+      'icon': '🪵',
+      'labelHi': 'लकड़ी',
+      'labelEn': 'Woodcraft'
+    },
+    {
+      'category': CraftCategory.metalcraft,
+      'icon': '⚙️',
+      'labelHi': 'धातु',
+      'labelEn': 'Metalcraft'
+    },
+    {
+      'category': CraftCategory.painting,
+      'icon': '🎨',
+      'labelHi': 'चित्रकारी',
+      'labelEn': 'Painting'
+    },
+    {
+      'category': CraftCategory.leathercraft,
+      'icon': '👜',
+      'labelHi': 'चर्म',
+      'labelEn': 'Leather'
+    },
+    {
+      'category': CraftCategory.jewelry,
+      'icon': '💍',
+      'labelHi': 'आभूषण',
+      'labelEn': 'Jewelry'
+    },
   ];
 
   static const _states = [
-    'Rajasthan', 'Uttar Pradesh', 'Gujarat', 'West Bengal', 'Madhya Pradesh',
-    'Odisha', 'Tamil Nadu', 'Karnataka', 'Maharashtra', 'Assam', 'Other',
+    'Rajasthan',
+    'Uttar Pradesh',
+    'Gujarat',
+    'West Bengal',
+    'Madhya Pradesh',
+    'Odisha',
+    'Tamil Nadu',
+    'Karnataka',
+    'Maharashtra',
+    'Assam',
+    'Other',
   ];
 
   Future<void> _save() async {
@@ -66,15 +116,19 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             : null,
         title: Row(
           mainAxisSize: MainAxisSize.min,
-          children: List.generate(2, (i) => Container(
-            margin: const EdgeInsets.symmetric(horizontal: 4),
-            width: i == _step ? 24 : 8,
-            height: 8,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(4),
-              color: i == _step ? AppColors.primary : AppColors.surfaceHighlight,
-            ),
-          )),
+          children: List.generate(
+              2,
+              (i) => Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    width: i == _step ? 24 : 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(4),
+                      color: i == _step
+                          ? AppColors.primary
+                          : AppColors.surfaceHighlight,
+                    ),
+                  )),
         ),
       ),
       body: SafeArea(
@@ -91,29 +145,41 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 24),
-        const Text(
+        const AppText(
           'आपका नाम क्या है?',
-          style: TextStyle(fontFamily: 'Poppins', fontSize: 26, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+          style: TextStyle(
+              fontFamily: 'Poppins',
+              fontSize: 26,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary),
         ),
         const SizedBox(height: 6),
-        const Text('What is your name?', style: TextStyle(fontFamily: 'Poppins', fontSize: 14, color: AppColors.textHint)),
         const SizedBox(height: 32),
         TextField(
           controller: _nameController,
-          style: const TextStyle(fontFamily: 'Poppins', fontSize: 22, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+          style: const TextStyle(
+              fontFamily: 'Poppins',
+              fontSize: 22,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary),
           decoration: InputDecoration(
-            hintText: 'राम लाल / Ramesh Kumar',
-            hintStyle: const TextStyle(fontFamily: 'Poppins', fontSize: 18, color: AppColors.textHint),
+            hintText: context.isHindi ? 'राम लाल' : 'Ramesh Kumar',
+            hintStyle: const TextStyle(
+                fontFamily: 'Poppins', fontSize: 18, color: AppColors.textHint),
             prefixIcon: const Padding(
               padding: EdgeInsets.all(16),
-              child: Text('👤', style: TextStyle(fontSize: 20)),
+              child: AppText('👤', style: TextStyle(fontSize: 20)),
             ),
           ),
           textCapitalization: TextCapitalization.words,
         ),
         const SizedBox(height: 16),
         // State selector
-        const Text('राज्य / State', style: TextStyle(fontFamily: 'Poppins', fontSize: 14, color: AppColors.textSecondary)),
+        const AppText('राज्य / State',
+            style: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 14,
+                color: AppColors.textSecondary)),
         const SizedBox(height: 8),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -127,8 +193,13 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
               value: _selectedState,
               isExpanded: true,
               dropdownColor: AppColors.surface,
-              style: const TextStyle(fontFamily: 'Poppins', fontSize: 15, color: AppColors.textPrimary),
-              items: _states.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+              style: const TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 15,
+                  color: AppColors.textPrimary),
+              items: _states
+                  .map((s) => DropdownMenuItem(value: s, child: AppText(s)))
+                  .toList(),
               onChanged: (v) => setState(() => _selectedState = v!),
             ),
           ),
@@ -142,12 +213,23 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           child: Container(
             height: 56,
             decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: [AppColors.primary, AppColors.secondary]),
+              gradient: const LinearGradient(
+                  colors: [AppColors.primary, AppColors.secondary]),
               borderRadius: BorderRadius.circular(16),
-              boxShadow: [BoxShadow(color: AppColors.primary.withOpacity(0.35), blurRadius: 20, offset: const Offset(0, 6))],
+              boxShadow: [
+                BoxShadow(
+                    color: AppColors.primary.withOpacity(0.35),
+                    blurRadius: 20,
+                    offset: const Offset(0, 6))
+              ],
             ),
             child: const Center(
-              child: Text('अगला →', style: TextStyle(fontFamily: 'Poppins', fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)),
+              child: AppText('अगला →',
+                  style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white)),
             ),
           ),
         ),
@@ -161,12 +243,20 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 24),
-        const Text(
+        const AppText(
           'आपकी कला?',
-          style: TextStyle(fontFamily: 'Poppins', fontSize: 26, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+          style: TextStyle(
+              fontFamily: 'Poppins',
+              fontSize: 26,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary),
         ),
         const SizedBox(height: 4),
-        const Text('Select your craft category', style: TextStyle(fontFamily: 'Poppins', fontSize: 13, color: AppColors.textHint)),
+        const AppText('Select your craft category',
+            style: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 13,
+                color: AppColors.textHint)),
         const SizedBox(height: 24),
         Expanded(
           child: GridView.builder(
@@ -187,22 +277,41 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                   duration: const Duration(milliseconds: 200),
                   decoration: BoxDecoration(
                     gradient: isSelected
-                        ? const LinearGradient(colors: [AppColors.primary, AppColors.secondary], begin: Alignment.topLeft, end: Alignment.bottomRight)
+                        ? const LinearGradient(
+                            colors: [AppColors.primary, AppColors.secondary],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight)
                         : null,
                     color: isSelected ? null : AppColors.surface,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: isSelected ? Colors.transparent : AppColors.glassBorder, width: 1.5),
+                    border: Border.all(
+                        color: isSelected
+                            ? Colors.transparent
+                            : AppColors.glassBorder,
+                        width: 1.5),
                     boxShadow: isSelected
-                        ? [BoxShadow(color: AppColors.primary.withOpacity(0.3), blurRadius: 12, spreadRadius: 1)]
+                        ? [
+                            BoxShadow(
+                                color: AppColors.primary.withOpacity(0.3),
+                                blurRadius: 12,
+                                spreadRadius: 1)
+                          ]
                         : null,
                   ),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(c['icon'] as String, style: const TextStyle(fontSize: 32)),
+                      AppText(c['icon'] as String,
+                          style: const TextStyle(fontSize: 32)),
                       const SizedBox(height: 6),
-                      Text(c['labelHi'] as String, style: TextStyle(fontFamily: 'Poppins', fontSize: 14, fontWeight: FontWeight.w600, color: isSelected ? Colors.white : AppColors.textPrimary)),
-                      Text(c['labelEn'] as String, style: TextStyle(fontFamily: 'Poppins', fontSize: 11, color: isSelected ? Colors.white70 : AppColors.textHint)),
+                      AppText(c['labelHi'] as String,
+                          style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: isSelected
+                                  ? Colors.white
+                                  : AppColors.textPrimary)),
                     ],
                   ),
                 ),
@@ -216,14 +325,29 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           child: Container(
             height: 56,
             decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: [AppColors.primary, AppColors.secondary]),
+              gradient: const LinearGradient(
+                  colors: [AppColors.primary, AppColors.secondary]),
               borderRadius: BorderRadius.circular(16),
-              boxShadow: [BoxShadow(color: AppColors.primary.withOpacity(0.35), blurRadius: 20, offset: const Offset(0, 6))],
+              boxShadow: [
+                BoxShadow(
+                    color: AppColors.primary.withOpacity(0.35),
+                    blurRadius: 20,
+                    offset: const Offset(0, 6))
+              ],
             ),
             child: Center(
               child: _saving
-                  ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
-                  : const Text('शुरू करें 🎨', style: TextStyle(fontFamily: 'Poppins', fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)),
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                          color: Colors.white, strokeWidth: 2.5))
+                  : const AppText('शुरू करें 🎨',
+                      style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white)),
             ),
           ),
         ),
