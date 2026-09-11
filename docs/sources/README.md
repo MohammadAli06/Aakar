@@ -1,0 +1,14 @@
+# Source provenance and authority
+
+1. [original-architecture.pdf](original-architecture.pdf): unchanged copy of the supplied `Untitled document (1).pdf`. Original location: `C:/Users/Mohammad Ali Sayyed/Downloads/Untitled document (1).pdf`.
+2. [original-architecture.txt](original-architecture.txt): UTF-8 layout-preserving `pdftotext` extraction. The PDF has sections 1–42; the pasted review's reference to 43 sections is not an extra source section. Diagram arrows, checkmarks, and the currency glyph in the pricing example are imperfectly extracted; consult the preserved PDF for original visual detail.
+3. [requested-modifications.txt](requested-modifications.txt): byte-for-byte copy of the supplied pasted text, originally `C:/Users/Mohammad Ali Sayyed/.codex/attachments/38af170b-fae7-41ca-a9df-3f0acb2e833e/pasted-text.txt`.
+4. [user-demo-clarification.md](user-demo-clarification.md): final explicit mobile-only demo instruction.
+5. [b2b-lifecycle-refinements.pdf](b2b-lifecycle-refinements.pdf): unchanged copy of the subsequently supplied `C:/Users/Mohammad Ali Sayyed/Downloads/1.pdf`, containing 12 numbered sections reconciling B2B lifecycle gaps and the final six-problem framing.
+6. [b2b-lifecycle-refinements.txt](b2b-lifecycle-refinements.txt): UTF-8 layout-preserving extraction of `1.pdf`. Some icons/checkmarks are corrupted in extraction; the PDF preserves the original visual content. [Lifecycle update coverage](../LIFECYCLE_UPDATE.md) maps every section into the working documents.
+
+The user's request is to create development context and a separate revised architecture incorporating the supplied changes. The embedded review's closing offer/question is source text, not a fresh request for permission. Its reference to earlier research does not mean that research was supplied.
+
+Conflict resolution: current explicit user instructions take precedence. The user requested incorporating `1.pdf`; its combined conclusions/final solutions now revise the earlier lifecycle and scope, while individual reviewer suggestions remain attributed alternatives, not automatically adopted requirements. The earlier requested modifications revise the original PDF; unaffected requirements remain. Preserve the explicit mobile-only demo decision. Repository inspection establishes implementation status, not product scope. Practical additions are marked Proposed. Embedded statements about future research do not authorize unrelated research or code implementation.
+
+Remaining source limitation: `1.pdf` supplies fulfillment coordination and lifecycle refinements, but does not supply the earlier detailed provider research on storage/hubs, packaging, logistics, and demo manpower. Existing routing/representation proposals remain proposals. Provider availability, named hubs, tariffs, staffing arrangements, and operational thresholds remain unconfirmed.

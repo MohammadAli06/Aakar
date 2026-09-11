@@ -86,8 +86,8 @@ async def compute_price_recommendation(
     base_margin = 0.30 + craftsmanship_score * 0.25   # 30–55% margin range
     recommended_min = max(cost_floor * (1 + base_margin), cost_floor * 1.15)
     recommended_max = min(cost_floor * (1 + base_margin + 0.3), market_max * 1.05)
-    recommended_min = round(min(recommended_min, market_max), 0)
-    recommended_max = round(min(recommended_max, market_max * 1.1), 0)
+    recommended_min = max(cost_floor, round(min(recommended_min, market_max), 0))
+    recommended_max = max(recommended_min, cost_floor, round(min(recommended_max, market_max * 1.1), 0))
 
     margin_en = recommended_min - cost_floor
     margin_hi = recommended_max - cost_floor

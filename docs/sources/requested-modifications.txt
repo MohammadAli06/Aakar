@@ -1,0 +1,51 @@
+Straight answer, no cushioning, since you asked for it directly.
+
+## Architecture — does the app/buyer/admin split work?
+
+**Yes, technically it holds together.** One Flutter app with a role-based mode switch (Artisan/Buyer) after login, one separate admin web dashboard, one common FastAPI backend — that's a sound, buildable shape. Auth and data model stay unified, and you avoid maintaining three separate frontends.
+
+**One thing I'd push back on, though:** putting Buyer Mode on mobile-only is a real UX mismatch, not a minor detail. Look at what you've designed for buyers — a 5-column artisan comparison table (§22), managing multiple RFQs, quotes, negotiations in parallel (§27-29). That's desk work for a procurement officer, not something anyone does comfortably on a phone screen. Artisans *need* mobile because that's their reality — low literacy, voice-first, one product at a time. Buyers don't have that constraint, and forcing them into the same mobile-first shape because it's convenient for you to build isn't optimizing for the buyer's actual workflow.
+
+You don't have to build a second frontend to fix this — since it's Flutter, the same buyer-mode code can compile to **Flutter Web** later for a desktop-class buyer experience, reusing your Dart code instead of standing up a separate Next.js app. Not urgent for the hackathon demo, but worth knowing it's not a fork-in-the-road decision — you can start mobile-only and add the web target later without a rewrite.
+
+---
+
+## What's actually missing from this document
+
+This is the important part, and it's not a small gap: **the entire physical fulfillment layer we spent the last turn designing — storage/hub routing, packaging, manpower for demos, delivery logistics — is absent.** Section 30 ("Basic Production & Fulfilment") gets a status tracker: `production started → in progress → ready → dispatched`, with optional photos. That's it. No mechanism for:
+- **How** a bulk order physically gets packaged for shipping
+- **Whether** it routes through a CFC/aggregation hub or ships direct (your AI storage-decision engine — gone)
+- **Who** carries it (India Post vs. consolidated hub-to-buyer logistics — gone)
+- **Who** represents the artisan for an on-site demo if a buyer wants one (gone)
+
+If this doc is meant to be the *complete* B2B plan, it isn't — it's the negotiation/matching half of it. The other half (which was literally the three things you asked me to research last time) didn't make it in. Either it needs merging in, or you need to be clear with yourselves that "research girl's" doc and my earlier B2B research are two halves of the same plan, not competing versions.
+
+**Second gap: no payment protection anywhere.** The flow goes `Agreement → Order → Production → Fulfilment/Dispatch → Completion`, with zero mention of *when money moves*. For a project whose entire premise is protecting vulnerable artisans from exploitation, having no milestone-payment or escrow concept between "agreement" and "artisan starts producing 500 units" is a real risk, not a nice-to-have. An artisan who fronts a month of labour on a verbal agreement with no payment checkpoint is exactly the failure mode this app is supposed to prevent.
+
+**Third, a real ambiguity: "B2B Readiness Check" is used for two different things and the doc doesn't distinguish them.** §13 checks photos/price/MOQ/capacity/lead time — that's *internal* readiness to be discoverable inside CraftConnect. The backend's `b2b.py` checks GSTIN/HSN code/GeM-ONDC eligibility — that's *external* readiness for a government channel. Right now the doc treats these as one gate. They're not — an artisan can be perfectly ready to receive a buyer's RFQ inside your app while being nowhere near GeM-eligible. Conflating them will produce a confusing "75% ready" number that doesn't actually tell the artisan what they're 75% ready *for*.
+
+---
+
+## What's dangerously overbuilt for a hackathon
+
+I'll be blunt: **section 33-39 (sealed-bid auction system) needs to come out of build scope entirely.** Scheduled bidding sessions, T-2-day/T-1-hour notification timers, sealed-offer submission, access control, artisan-controlled selection with quantity splitting — that's not a feature, that's a second product. It's real-time infra, notification scheduling, and a whole selection-logic engine, for something the PS never asked for and that's explicitly labeled "optional/secondary" even in your own doc. Good instinct flagging it optional — bad instinct including 7 detailed sub-sections for something you're not going to build. Cut it from the working demo. Keep it as one slide: "designed for later — artisan-initiated bidding for surplus stock."
+
+**The admin dashboard (§42) has the same problem at smaller scale** — trust & safety, dispute resolution with evidence/review workflows, bidding monitoring, full ecosystem analytics. That's an ops platform for a live company, not a hackathon deliverable. Keep: verification queue, basic product moderation, basic analytics. Cut or mock: dispute resolution workflow, trust & safety scoring, bidding monitoring (moot if bidding itself is cut).
+
+Here's the honest read on the whole document: **it's a strong, well-thought-out product vision — genuinely better structured than what I'd have guessed you'd land on — but it's scoped like a funded startup's 6-month roadmap, not a hackathon build.** If your team tries to build all 43 sections, you'll end up with a dozen half-finished screens and nothing that survives a live demo. If you present it as "vision doc, here's what's actually wired up," it's a strong differentiator.
+
+---
+
+## What I'd actually put in the demo build
+
+| Keep — build for real | Cut — vision slide only |
+|---|---|
+| Artisan onboarding + full product creation flow (§3-12) | Sealed-bid auction system (§33-39) |
+| Adaptive cataloging + voice verify (already backed) | Full admin trust & safety / dispute workflows |
+| Explainable pricing (already backed) | Bidding monitoring in admin |
+| B2B readiness check — **split into internal vs. GeM/ONDC**, keep both simple | Live marketplace/GeM API sync (mock it, be honest it's a connection point) |
+| Buyer post-requirement → AI structuring → matching → basic quote/negotiate (§15-29, simplified) | Saved suppliers/reorder (nice, but cuttable if time-tight) |
+| **Storage-routing decision + packaging guidance from the earlier B2B plan — put this back in, it's your strongest USP** | Full production ERP-style tracking (keep to 4 statuses max) |
+| Basic milestone payment status (even if just UI — "advance paid / balance due") | Business insights analytics (nice-to-have, low priority) |
+
+Want me to merge this doc with the earlier B2B research into one reconciled architecture + flow — fixing the readiness-check split and adding the missing storage/packaging/logistics layer back in — and update the implementation plan file with it?

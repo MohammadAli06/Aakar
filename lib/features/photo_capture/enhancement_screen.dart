@@ -275,7 +275,7 @@ class _EnhancementScreenState extends State<EnhancementScreen>
                     child: Container(
                       decoration: const BoxDecoration(
                         gradient: LinearGradient(
-                          colors: [Color(0xFF1A1A2E), Color(0xFF13131F)],
+                          colors: [AppColors.surfaceLight, AppColors.surface],
                         ),
                       ),
                       child: Stack(

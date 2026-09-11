@@ -21,6 +21,7 @@ Thumbs.db
 # IDE and Editor files
 .idea/
 .vscode/
+.commandcode/
 *.iml
 *.ipr
 *.iws
@@ -53,6 +54,10 @@ wheels/
 backend/.env
 backend/app.db
 backend/test.db
+backend/demo.db
+backend/*.db-shm
+backend/*.db-wal
+backend/uploads/
 backend/*.log
 
 # Flutter & Dart
@@ -78,9 +83,7 @@ android/app/debug/
 *.keystore
 key.properties
 
-# iOS / macOS
-ios/Runner.xcworkspace/
-ios/Runner.xcodeproj/project.xcworkspace/
+# iOS / macOS (shared workspace settings stay tracked so Xcode opens on any machine)
 ios/Runner.xcodeproj/xcuserdata/
 ios/Pods/
 ios/.symlinks/

@@ -6,13 +6,14 @@ import '../../features/onboarding/onboarding_screen.dart';
 import '../../features/auth/auth_screen.dart';
 import '../../features/auth/otp_screen.dart';
 import '../../features/profile/profile_setup_screen.dart';
-import '../../features/dashboard/dashboard_screen.dart';
 import '../../features/photo_capture/photo_capture_screen.dart';
 import '../../features/photo_capture/enhancement_screen.dart';
 import '../../features/cataloging/voice_catalog_screen.dart';
 import '../../features/cataloging/listing_preview_screen.dart';
 import '../../features/pricing/pricing_screen.dart';
 import '../../features/b2b/b2b_screen.dart';
+import '../../features/commerce/presentation/commerce_screen.dart';
+import '../../features/commerce/presentation/product_studio_screen.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
@@ -57,8 +58,24 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/dashboard',
         name: 'dashboard',
-        builder: (context, state) => const DashboardScreen(),
+        builder: (context, state) => const CommerceScreen(),
       ),
+      GoRoute(
+          path: '/workspace/create',
+          builder: (context, state) => const ProductStudioScreen()),
+      GoRoute(
+          path: '/workspace/create/:id',
+          builder: (context, state) =>
+              ProductStudioScreen(productId: state.pathParameters['id'])),
+      GoRoute(
+          path: '/workspace/:page',
+          builder: (context, state) =>
+              CommerceScreen(page: state.pathParameters['page']!)),
+      GoRoute(
+          path: '/workspace/:page/:id',
+          builder: (context, state) => CommerceScreen(
+              page: state.pathParameters['page']!,
+              id: state.pathParameters['id'])),
       GoRoute(
         path: '/photo-capture',
         name: 'photoCapture',

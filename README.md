@@ -1,182 +1,86 @@
-# Aakar 🎨
-### AI-Driven Market Linkage & Smart Cataloging for Marginalized Artisans
-**SIH 2026 · PS 26090 · Ministry of Social Justice and Empowerment (MoSJE)**
+# Aakar / CraftConnect
 
-> *"We don't teach artisans how to use e-commerce. We make e-commerce understand the artisan."*
+SIH 2026, PS 26090: AI-assisted cataloging and market linkage for artisans. One Flutter mobile app serves Artisan and Buyer modes; a separate lightweight admin dashboard uses the shared FastAPI backend.
 
----
+[Architecture](docs/UPDATED_ARCHITECTURE.md) | [Implemented workflows](docs/IMPLEMENTED_WORKFLOWS.md) | [Checklist](docs/IMPLEMENTATION_PLAN.md) | [Coding instructions](AGENTS.md) | [Source documents](docs/sources/README.md)
 
-## 🚀 Quick Start — Flutter App
+## Run the mobile demo
 
-### Prerequisites
-- Flutter 3.44+ (`flutter --version`)
-- Android Studio / Xcode for emulator
-- **OR** physical Android/iOS device
-
-### Run
-```bash
-# Install dependencies
+```powershell
 flutter pub get
-
-# Run on connected device or emulator
 flutter run
-
-# For demo mode (no Firebase needed):
-# Tap "Demo Mode (Judges)" on the auth screen
 ```
 
-### Firebase Setup (Real Auth)
-1. Create a Firebase project at [console.firebase.google.com](https://console.firebase.google.com)
-2. Enable **Phone Authentication**
-3. Register your Android app (package: `com.craftconnect.craft_connect`)
-4. Download `google-services.json` → place in `android/app/`
-5. For iOS: download `GoogleService-Info.plist` → place in `ios/Runner/`
+Select the explicit demo login. Use the role toggle after login to show both modes on one phone/emulator. The app saves on-device records between launches. Product Studio ends with **Save to My Products**; publication is a separate action after readiness and artisan approval.
 
----
+The cream/forest-green interface includes buyer discovery, requirements and explainable matches, supplier comparison, RFQs, chat, structured quote revisions, sample approval, payment milestones, production/checkpoint updates, packaging and shipment records, inspection, issue reporting, saved suppliers and fresh reorders.
 
-## 🖥️ Quick Start — FastAPI Backend
+## Run the shared backend and admin
 
-### With Docker (recommended)
-```bash
+Create an environment and install requirements once:
+
+```powershell
+py -m venv backend/.venv
+backend/.venv/Scripts/python.exe -m pip install -r backend/requirements.txt
+```
+
+Then:
+
+```powershell
 cd backend
-
-# Copy and configure environment
-cp .env.example .env
-# Edit .env with your API keys (Groq, Bhashini, Firebase)
-
-# Start all services (PostgreSQL, Redis, FastAPI, Celery)
-docker-compose up -d
-
-# API docs available at:
-# http://localhost:8000/docs
+.\run_demo.ps1
 ```
 
-### Without Docker
-```bash
-cd backend
-pip install -r requirements.txt
+This starts a persistent SQLite demo without Docker and prints separate mobile/admin tokens. In mobile **Profile > Connect backend workspace**, use the mobile token with `http://10.0.2.2:8000` for an Android emulator or your computer's LAN address for a physical phone. Connecting opens the server's records instead of merging local records. Pull to refresh for admin/other-device changes.
 
-# Set up PostgreSQL and Redis, update .env
+Open [Admin dashboard](http://localhost:8000/api/v1/workspace/admin) in a computer browser; use the admin token for verification, moderation, manual issues and progress review. [API docs](http://localhost:8000/docs) describe the endpoints. The admin token is separate from the token entered on the phone.
 
-# Run migrations
-alembic upgrade head
+For PostgreSQL development, configure `backend/.env` from `.env.example` and start the database. From **inside backend/** run:
 
-# Start server
-uvicorn main:app --reload --port 8000
-
-# Start Celery worker (separate terminal)
-celery -A app.workers.celery_app worker --loglevel=info
+```powershell
+$env:DEBUG = 'false'
+.\.venv\Scripts\python.exe -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
----
+Use `main:app` from this folder. Startup creates missing tables; no Alembic migrations are supplied. Compose defines PostgreSQL, Redis, API and Celery, but the complete Docker stack is not part of the validated SQLite demo.
 
-## 🏗️ Project Structure
+## Technical stack
 
-```
-Aakar/
-├── lib/                          # Flutter app
-│   ├── core/
-│   │   ├── theme/               # Design system (colors, typography)
-│   │   ├── routing/             # GoRouter navigation
-│   │   └── services/            # API, Firebase, Mock AI services
-│   ├── features/
-│   │   ├── onboarding/          # Splash, Language, Onboarding slides
-│   │   ├── auth/                # Phone OTP + Firebase Auth
-│   │   ├── profile/             # Artisan setup (name, craft, state)
-│   │   ├── dashboard/           # Product list + stats
-│   │   ├── photo_capture/       # Guided capture + Enhancement
-│   │   ├── cataloging/          # Voice → Listing (adaptive Q&A)
-│   │   ├── pricing/             # Labour-aware pricing engine
-│   │   └── b2b/                 # B2B readiness + channel connect
-│   └── shared/
-│       ├── models/              # Data models (Product, Listing, Pricing...)
-│       └── widgets/             # Reusable UI components
-├── backend/                      # FastAPI backend
-│   ├── main.py                  # App factory
-│   ├── app/
-│   │   ├── core/                # Config, DB, Firebase auth
-│   │   ├── routers/             # auth, products, catalog, pricing, b2b
-│   │   ├── services/            # ASR (Bhashini), extraction, generation, pricing
-│   │   └── models/              # SQLAlchemy ORM models
-│   ├── docker-compose.yml       # Full stack: PG + Redis + FastAPI + Celery
-│   └── .env.example             # Environment template
-└── assets/                       # Images, animations, fonts
-```
-
----
-
-## 🎯 Key Differentiators
-
-| Claim | Technical Backing |
+| Layer | Implementation |
 |---|---|
-| **Not just another AI cataloger** | Confidence-scored extraction → only asks for genuinely uncertain fields |
-| **Craft-authentic photos** | Hue-preserving enhancement; original stored alongside enhanced |
-| **Doesn't undervalue handmade labour** | Comparable set is handmade-only; cost floor is a hard constraint |
-| **Artisan stays in control** | `verification_status` on every AI entity — nothing publishes without approval |
-| **Built for low literacy** | Voice-first at every step, Hindi-primary throughout (not just labels) |
+| Mobile | Flutter / Dart, Riverpod, GoRouter; Android demo target, iOS source retained |
+| Interface | Shared cream/forest-green components, Poppins, Hindi/English forms |
+| Voice and images | speech_to_text, flutter_tts, camera/gallery, original-preserving image adjustment |
+| State | SharedPreferences local demo; shared backend repository with version conflict handling |
+| Backend | FastAPI, Pydantic, async SQLAlchemy; PostgreSQL configuration and SQLite demo runner |
+| Assistant | Configured OpenAI-compatible LLM for reviewable catalog/requirement/translation/quote drafts; labeled basic/manual fallback |
+| Identity | Firebase Phone Auth adapter; separate explicitly enabled seeded demo workspace |
+| Admin | Plain HTML/CSS/JavaScript, common FastAPI database, separate admin access token |
+| Media | Authenticated demo photo uploads, validation and EXIF stripping |
 
----
+The solution connects artisan-approved catalog creation and labour-aware pricing to buyer sourcing, explicit agreement, production, physical fulfillment coordination and buyer acceptance. Business state persists across role changes, and the workflow enforces sample, capacity, cost-floor, milestone and completion guards.
 
-## 🛠️ Tech Stack
+## Configuration and honest demo boundaries
 
-| Layer | Technology |
-|---|---|
-| Mobile App | Flutter 3.44 (Android + iOS) |
-| State Management | Riverpod 2 |
-| Navigation | GoRouter |
-| Backend | FastAPI (Python 3.12) |
-| Database | PostgreSQL + pgvector |
-| Queue | Celery + Redis |
-| Auth | Firebase Phone Auth |
-| Storage | Firebase Storage |
-| ASR | Bhashini (primary) + IndicConformer (fallback) |
-| LLM | Groq/Llama-3.1 (demo) → self-hostable |
-| Image ML | U²-Net/MODNet (ONNX) |
+Demo payments are status records: no money is held or transferred. Logistics records do not book carriers/hubs, and external marketplace preparation does not submit to GeM/ONDC/state boards. Sample products/comparables are fixtures with clearly identified illustrations. Auctions and advanced admin remain deferred per the architecture.
 
----
+Set `LLM_API_KEY`, `LLM_API_BASE` and a supported `LLM_MODEL` in backend configuration for live assistant drafts. For real phone sign-in configure the Firebase project, platform service files and phone authentication. No credentials are included. Voice/TTS depend on device availability and permissions; text entry remains available.
 
-## 📱 App Flow
+The shared demo endpoint is disabled in production and grants one token access to the seeded demonstration identities. It is not a production multi-tenant application. Production authorization, storage, migrations and provider integration still need work. See [the full coverage and limitations](docs/IMPLEMENTED_WORKFLOWS.md).
 
-```
-Splash → Language Select → Onboarding (3 slides)
-  → Phone OTP Auth
-  → Profile Setup (name, craft, state)
-  → Dashboard
+## Validation
 
-Dashboard → New Product:
-  → Photo Capture (guided)
-  → AI Enhancement (before/after compare)
-  → Voice Describe
-  → Attribute Extraction (confidence-scored)
-  → Follow-up Q&A (only missing fields)
-  → Bilingual Listing Preview
-  → Artisan Verify & Approve
-  → Pricing Input (material + labour + overhead)
-  → AI Price Recommendation (with explanation)
-  → Artisan Sets Final Price
-  → B2B Readiness Check (GeM / ONDC / State Board)
-  → Connect to Marketplace
+```powershell
+flutter test --no-pub
+flutter analyze --no-pub
+flutter build apk --debug --no-pub
 ```
 
----
+From backend:
 
-## 🔑 API Keys Required
+```powershell
+$env:DEBUG = 'false'
+.venv/Scripts/python.exe -m unittest discover -s tests -v
+```
 
-| Service | Where to Get | Free? |
-|---|---|---|
-| Firebase | [console.firebase.google.com](https://console.firebase.google.com) | Yes |
-| Groq (LLM) | [console.groq.com](https://console.groq.com) | Yes (generous) |
-| Bhashini ASR | [bhashini.gov.in/ulca/model-api-key](https://bhashini.gov.in) | Yes (govt) |
-
----
-
-## 🏛️ Demo Mode
-
-The app includes a full **demo bypass** — no Firebase or API keys needed:
-- On Auth screen → tap **"Demo Mode (Judges)"**
-- All AI features use realistic mock responses
-- Complete flow: Photo → Catalog → Price → B2B works end-to-end
-
----
-
-*Built for SIH 2026 · Team Aakar*
+The Android APK builds. Existing analyzer style/deprecation findings and Kotlin plugin compatibility warnings remain. Device camera/voice/Firebase OTP and iOS compilation require separate device validation. Automated tests cover workflow transitions, persistence, English/Hindi phone layouts, backend access, version conflicts, media and fallback behavior.

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/services/phone_auth_service.dart';
 
 class AuthScreen extends ConsumerStatefulWidget {
   const AuthScreen({super.key});
@@ -33,12 +34,15 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       return;
     }
     setState(() => _loading = true);
-    // Simulate OTP send delay
-    await Future.delayed(const Duration(seconds: 1));
-    setState(() => _loading = false);
-    if (mounted) {
-      context.push('/auth/otp', extra: '$_countryCode$phone');
-    }
+    try {
+      final automatic = await PhoneAuthService.send('$_countryCode$phone');
+      if (mounted) {
+        if (automatic) { context.go('/dashboard'); }
+        else { context.push('/auth/otp', extra: '$_countryCode$phone'); }
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    } finally { if (mounted) setState(() => _loading = false); }
   }
 
   @override

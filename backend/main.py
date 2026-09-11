@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
-from app.routers import auth, products, catalog, pricing, b2b
+from app.routers import auth, products, catalog, pricing, b2b, workspace
 from app.core.config import settings
 from app.core.database import engine, Base
 
@@ -16,8 +16,10 @@ async def lifespan(app: FastAPI):
     # Startup: create tables
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    yield
-    # Shutdown: cleanup
+    try:
+        yield
+    finally:
+        await engine.dispose()
 
 
 def create_app() -> FastAPI:
@@ -45,6 +47,7 @@ def create_app() -> FastAPI:
     app.include_router(catalog.router, prefix="/api/v1/catalog", tags=["Catalog"])
     app.include_router(pricing.router, prefix="/api/v1/pricing", tags=["Pricing"])
     app.include_router(b2b.router, prefix="/api/v1/b2b", tags=["B2B"])
+    app.include_router(workspace.router, prefix="/api/v1/workspace", tags=["Demo workspace"])
 
     @app.get("/health")
     async def health():

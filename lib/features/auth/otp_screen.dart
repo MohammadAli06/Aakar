@@ -2,8 +2,8 @@ import '../../core/localization/app_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pinput/pinput.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/services/phone_auth_service.dart';
 
 class OtpScreen extends StatefulWidget {
   final String phoneNumber;
@@ -38,21 +38,14 @@ class _OtpScreenState extends State<OtpScreen> {
   }
 
   Future<void> _verifyOtp(String otp) async {
-    if (otp.length < 6) return;
+    if (otp.length < 6 || _loading) return;
     setState(() => _loading = true);
-    await Future.delayed(const Duration(seconds: 1));
-    // Mock: any 6-digit OTP works
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('auth_token', 'token_${widget.phoneNumber}');
-    final profileSetup = prefs.getBool('profile_setup_done') ?? false;
-    setState(() => _loading = false);
-    if (mounted) {
-      if (!profileSetup) {
-        context.go('/profile-setup');
-      } else {
-        context.go('/dashboard');
-      }
-    }
+    try {
+      await PhoneAuthService.verify(otp);
+      if (mounted) context.go('/dashboard');
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    } finally { if (mounted) setState(() => _loading = false); }
   }
 
   @override
@@ -195,7 +188,10 @@ class _OtpScreenState extends State<OtpScreen> {
               Center(
                 child: _canResend
                     ? TextButton(
-                        onPressed: () {
+                          onPressed: () async {
+                            try { await PhoneAuthService.send(widget.phoneNumber); }
+                            catch (e) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e'))); return; }
+                            if (!mounted) return;
                           setState(() {
                             _canResend = false;
                             _resendSeconds = 30;

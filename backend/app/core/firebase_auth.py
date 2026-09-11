@@ -28,8 +28,8 @@ async def verify_firebase_token(id_token: str) -> dict:
     Verify a Firebase ID token and return decoded claims.
     In demo mode (no Firebase credentials), returns mock claims.
     """
-    if not settings.FIREBASE_CREDENTIALS_PATH:
-        # Demo mode — trust any token, return mock claims
+    if settings.ENABLE_DEMO_WORKSPACE and settings.ENVIRONMENT != 'production' and id_token == 'demo_token':
+        # Explicit development fixture; arbitrary tokens are never trusted.
         return {
             "uid": f"demo_{id_token[:8]}",
             "phone_number": "+919876543210",

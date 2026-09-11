@@ -97,13 +97,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
             backgroundColor: AppColors.background,
             flexibleSpace: FlexibleSpaceBar(
               background: Container(
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
-                      Color(0xFF1A0A2E),
-                      Color(0xFF0A1A2E),
+                      AppColors.primary.withOpacity(0.3),
+                      AppColors.secondary.withOpacity(0.2),
                       AppColors.background
                     ],
                   ),
@@ -288,8 +288,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         height: 52,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          gradient: const LinearGradient(
-                              colors: [AppColors.secondary, Color(0xFF8A84FF)]),
+                          gradient: const LinearGradient(colors: [
+                            AppColors.secondary,
+                            AppColors.primaryLight
+                          ]),
                           boxShadow: [
                             BoxShadow(
                                 color: AppColors.secondary.withOpacity(0.3),

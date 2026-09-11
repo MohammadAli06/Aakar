@@ -15,7 +15,7 @@ class AakarApp extends ConsumerWidget {
       title: 'Aakar',
       locale: Locale(ref.watch(selectedLanguageProvider)),
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.darkTheme,
+      theme: AppTheme.lightTheme,
       routerConfig: router,
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,

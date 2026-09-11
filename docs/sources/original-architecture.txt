@@ -1,0 +1,895 @@
+CRAFTCONNECT
+
+AI-Powered Digital Business Assistant for Marginalized Artisans
+
+1. OVERALL ARCHITECTURE
+
+             CRAFTCONNECT
+
+                │
+
+       ┌───────────────┴───────────────┐
+
+       ↓                ↓
+
+SINGLE MOBILE APP          ADMIN WEB
+
+       │
+
+┌─────┴─────┐
+
+↓         ↓
+
+ARTISAN BUYER
+
+MODE         MODE
+
+│         │
+
+└─────┬─────┘
+
+       ↓
+
+COMMON BACKEND
+
+       ↓
+
+DATABASE + AI + APIs
+
+User experience
+
+One mobile app
+
+●​ Artisan Mode
+●​ Buyer Mode
+
+Admin
+
+Separate Web Dashboard
+
+Backend
+
+Common for everyone.
+
+2. ARTISAN MODE — MAIN FEATURES
+A. Onboarding
+
+Open App
+↓
+Select Language
+↓
+Create Profile
+↓
+Artisan Identity / Eligibility Verification
+↓
+Artisan Home
+
+Includes
+
+    ●​ Language selection
+    ●​ Local/regional language support
+    ●​ Voice-first interaction
+    ●​ Simple visual UI
+    ●​ Artisan profile
+    ●​ Identity/eligibility verification
+    ●​ Help / Voice Assistant
+
+3. ARTISAN PRODUCT CREATION
+
+This is the main AI workflow.
+
+ADD PRODUCT
+   ↓
+
+AI-GUIDED PHOTO CAPTURE
+   ↓
+
+TAKE PHOTO
+   ↓
+
+AI IMAGE ENHANCEMENT
+   ↓
+
+SPEAK ABOUT PRODUCT
+   ↓
+
+IMAGE + VOICE UNDERSTANDING
+   ↓
+
+AI ATTRIBUTE EXTRACTION
+   ↓
+
+MISSING / UNCERTAIN INFORMATION
+   ↓
+
+AI CATALOG + DESCRIPTION
+   ↓
+
+ARTISAN LISTENS
+   ↓
+VERIFY / CORRECT THROUGH VOICE
+
+   ↓
+AI PRICING ASSISTANT
+
+   ↓
+FINALIZE PRICE
+
+   ↓
+SAVE PRODUCT TO MY PRODUCTS
+Important:​
+Yahin product creation flow end hota hai.
+Artisan ko immediately publish karna compulsory nahi hai.
+
+4. AI-GUIDED PHOTO CAPTURE
+
+AI artisan ko photo lene mein guide karega.
+
+Checks
+
+    ●​ Lighting
+    ●​ Framing
+    ●​ Angle
+    ●​ Product visibility
+    ●​ Image quality
+Example:
+
+        “Photo thodi dark hai. Product ko light ke paas rakhiye.”
+
+5. AI IMAGE ENHANCER & STUDIO
+
+AI can:
+    ●​ improve lighting
+    ●​ remove/clean distracting background
+    ●​ improve crop/framing
+    ●​ enhance image quality
+
+Authenticity rule
+
+AI must preserve:
+    ●​ real colour
+    ●​ texture
+    ●​ shape
+    ●​ design
+    ●​ craftsmanship
+It should not artificially redesign the product.
+
+6. VOICE-TO-CATALOG
+
+Artisan simply speaks in their selected language.
+Example:
+
+        “Ye bamboo ka basket hai, maine haath se banaya hai…”
+AI extracts relevant information such as:
+
+    ●​ Product name
+    ●​ Category
+    ●​ Craft type
+    ●​ Material
+    ●​ Colour
+    ●​ Size/dimensions
+    ●​ Usage
+    ●​ Craft details/story
+    ●​ Other relevant attributes
+
+7. ADAPTIVE AI QUESTIONS
+
+No long form.
+AI checks what it already knows.
+If something is missing or uncertain:
+
+        Only then ask.
+Example:
+
+        “Ek mahine mein kitne baskets bana sakte ho?”
+If AI is uncertain about a field, it asks artisan to confirm instead of silently guessing.
+8. AI CATALOG GENERATION
+
+AI generates:
+
+    ●​ Product title
+    ●​ Category
+    ●​ Structured attributes
+    ●​ Professional description
+    ●​ Craft-aware description
+    ●​ Craft/story information
+    ●​ B2B-friendly specifications
+
+9. ARTISAN VOICE VERIFICATION
+
+This is product-information verification, not KYC.
+
+AI reads/speaks the generated information in artisan's language.
+
+Example:
+
+        “Maine samjha ki ye bamboo ka handwoven basket hai, 2 feet ka hai. Kya ye
+        sahi hai?”
+
+Artisan says:
+
+        “Haan.”
+
+or:
+
+        “Nahi, size 1.5 feet hai.”
+
+AI updates it.
+
+AI Generated Information
+      ↓
+
+AI Reads It In Artisan's Language
+      ↓
+
+Artisan Confirms / Corrects
+      ↓
+
+Final Verified Product Information
+10. AI DYNAMIC PRICING ASSISTANT
+
+AI considers:
+    ●​ Material cost
+    ●​ Labour
+    ●​ Labour/time
+    ●​ Craftsmanship
+    ●​ Relevant handmade market prices
+    ●​ Comparable products
+
+Output:
+
+Suggested Price Range
+
+    ●​
+
+Why this price?
+
+Example:
+        Suggested range: ₹420–₹480
+
+Artisan:
+Accept / Edit
+
+Important
+
+AI does not impose the price.
+Artisan decides the final price.
+
+11. PRODUCT SAVED TO MY PRODUCTS
+
+After pricing is finalized:
+PRICE FINALIZED
+
+     ↓
+PRODUCT SAVED
+
+     ↓
+MY PRODUCTS
+Product status can be:
+    ●​ Draft
+    ●​ Ready to publish
+    ●​ Published
+    ●​ Needs update
+
+Artisan can leave it there and publish later.
+
+12. MY PRODUCTS
+
+Artisan can:
+
+    ●​ View products
+    ●​ Edit
+    ●​ Re-verify
+    ●​ Update
+    ●​ Publish
+    ●​ Republish
+    ●​ View status
+    ●​ View basic performance insights
+
+13. PUBLISHING FLOW — SEPARATE
+FROM PRODUCT CREATION
+
+Whenever artisan decides to publish:
+
+MY PRODUCTS
+   ↓
+
+SELECT PRODUCT
+   ↓
+
+PUBLISH
+   ↓
+
+B2B READINESS CHECK
+
+B2B Readiness checks:
+
+    ●​ Photos
+    ●​ Product details
+    ●​ Price
+    ●​ MOQ
+    ●​ Available quantity
+    ●​ Production capacity
+    ●​ Lead time
+    ●​ Customization capability
+    ●​ Location
+
+If something missing:
+
+Missing Information
+     ↓
+
+Complete Required Details
+     ↓
+
+B2B Ready
+
+Then:
+
+Publish
+
+14. CAPACITY MANAGEMENT
+
+Artisan can maintain:
+
+    ●​ Current stock
+    ●​ Available quantity
+    ●​ Weekly/monthly production capacity
+    ●​ Average production time
+    ●​ Availability
+
+This information supports:
+
+B2B matching + quotation + bidding + readiness.
+
+15. NORMAL B2B FLOW
+
+BUYER
+↓
+POST REQUIREMENT
+↓
+AI UNDERSTANDS / STRUCTURES REQUIREMENT
+↓
+SMART ARTISAN MATCHING
+↓
+BUYER VIEWS MATCHES
+↓
+SELECTS ARTISAN
+↓
+B2B INQUIRY
+↓
+AI SIMPLIFIES REQUIREMENT
+↓
+TRANSLATION
+↓
+VOICE / CHAT
+↓
+CUSTOMIZATION
+↓
+CAPACITY CHECK
+↓
+QUOTATION
+↓
+NEGOTIATION IF NEEDED
+↓
+AGREEMENT
+↓
+ORDER
+↓
+PRODUCTION
+↓
+FULFILMENT / DISPATCH
+↓
+COMPLETION
+↓
+REORDER
+
+16. BUYER MODE — SAME MOBILE APP
+
+Buyer logs in to the same CraftConnect app but enters Buyer Mode.
+
+Buyer Home
+
+BUYER HOME
+
+Search / Discover
+Post Requirement
+My Requirements
+Matched Artisans
+Inquiries
+Quotes
+Orders
+Bidding Sessions
+Saved Suppliers
+Notifications
+Business Profile
+
+17. BUYER ONBOARDING
+
+Buyer can provide:
+    ●​ Business/organization name
+    ●​ Business type
+    ●​ Industry/category
+    ●​ Location
+    ●​ Contact details
+    ●​ Relevant verification information
+
+Buyer receives a verification/trust status.
+
+18. BUYER DISCOVERY
+
+Buyer can:
+
+Search Products
+
+or
+
+Browse Artisans
+
+or
+
+Post Requirement
+
+So buyer isn't forced into one path.
+
+19. AI POST REQUIREMENT
+
+Buyer can type or speak.
+Example:
+        “Mujhe 500 handmade bamboo baskets chahiye, 30 days mein.”
+
+AI structures it into:
+
+Product
+Quantity
+Budget
+Deadline
+Customization
+Location
+Other Requirements
+
+Buyer confirms.
+
+20. SMART ARTISAN MATCHING
+
+Matching considers:
+
+    ●​ Craft
+    ●​ Product
+    ●​ Quantity
+    ●​ MOQ
+    ●​ Available stock
+    ●​ Production capacity
+    ●​ Lead time
+    ●​ Price
+    ●​ Customization
+    ●​ Availability
+    ●​ Location
+
+And buyer gets the reason.
+
+Example:
+
+        92% Match
+
+        ✓ Product​
+         ✓ Quantity​
+         ✓ Capacity​
+         ✓ Lead time​
+         ✓ Customization
+21. PRODUCT / ARTISAN DETAIL
+
+Buyer sees:
+
+Product
+
+    ●​ AI-enhanced images
+    ●​ Product details
+    ●​ Material
+    ●​ Craft
+    ●​ Price
+    ●​ MOQ
+    ●​ Available quantity
+    ●​ Capacity
+    ●​ Lead time
+    ●​ Customization
+    ●​ Location
+
+Artisan
+
+    ●​ Profile
+    ●​ Craft
+    ●​ Verification/trust status
+    ●​ Experience
+    ●​ Craft story
+
+22. ARTISAN COMPARISON
+
+Example:
+
+               Artisan A Artisan B
+
+Price          ₹450     ₹430
+
+MOQ            50       100
+
+Capacity       500      300
+
+Lead Time      20 days  15 days
+Customization
+Verification   ✅        ✅
+               ✅        ✅
+23. B2B INQUIRY / RFQ
+
+Buyer sends:
+    ●​ Quantity
+    ●​ Specifications
+    ●​ Deadline
+    ●​ Customization
+    ●​ Delivery location
+    ●​ Other requirements
+
+24. AI B2B VIRTUAL BUSINESS
+MANAGER
+
+Buyer → Artisan
+
+Buyer:
+        “We require 500 units with customized dimensions and delivery within 30 days.”
+
+AI gives artisan:
+        “Buyer ko 500 pieces chahiye, size customization ke saath, 30 din mein.”
+
+Artisan → Buyer
+
+Artisan can speak:
+        “500 pieces possible hain, 28 din lagenge.”
+
+AI converts it into appropriate business language for the buyer.
+So:
+Buyer Requirement
+
+     ↕
+AI Understanding + Simplification + Translation
+
+     ↕
+Artisan Local Language
+
+25. STRUCTURED CUSTOMIZATION
+Customization can cover:
+    ●​ Size
+    ●​ Colour
+    ●​ Pattern
+    ●​ Packaging
+    ●​ Logo/branding
+    ●​ Other modifications
+
+26. CAPACITY CONFIRMATION
+
+Buyer sees:
+Confirmed
+Partial
+Declined
+based on artisan response.
+
+27. QUOTATION
+
+Quote includes:
+    ●​ Unit price
+    ●​ Quantity
+    ●​ MOQ
+    ●​ Lead time
+    ●​ Customization
+    ●​ Delivery
+    ●​ Terms
+
+Buyer:
+Accept / Request Change / Reject
+
+28. NEGOTIATION
+If needed:
+    ●​ Price changes
+    ●​ Quantity changes
+    ●​ Term changes
+    ●​ Quote versions
+    ●​ Clear history
+
+No unnecessary complicated contract system.
+
+29. AGREEMENT → ORDER
+
+Once terms are finalized:
+Final Terms
+↓
+Agreement / Confirmation
+↓
+Order Created
+
+30. BASIC PRODUCTION & FULFILMENT
+
+Artisan updates:
+
+    ●​ Production started
+    ●​ In progress
+    ●​ Ready
+    ●​ Dispatched
+Can optionally provide:
+    ●​ Progress photos
+    ●​ Quality-check photos
+    ●​ Dispatch proof
+No full manufacturing ERP.
+
+31. ORDER MANAGEMENT
+Artisan
+
+New
+Confirmed
+In Production
+Ready
+Dispatched
+Completed
+
+Buyer
+
+Pending
+Confirmed
+In Production
+Ready
+Dispatched
+Completed
+
+32. SAVED SUPPLIERS + REORDER
+
+Buyer can:
+
+    ●​ Save artisan
+    ●​ Save supplier
+    ●​ Reorder previous product
+    ●​ Repeat B2B purchase
+
+33. OPTIONAL ARTISAN-INITIATED
+BIDDING
+
+This is secondary/advanced, not default.
+
+Artisan voluntarily creates it when:
+
+    ●​ available stock
+    ●​ available capacity
+    ●​ seasonal opportunity
+    ●​ surplus production
+    ●​ standardized product
+
+Flow:
+ARTISAN
+↓
+Select Existing Product
+↓
+Set Available Quantity
+↓
+Set Minimum Acceptable Price
+↓
+Set Date + Time
+↓
+Schedule Bidding Session
+↓
+Relevant + Verified Buyers Identified
+↓
+Invitations
+↓
+Notifications
+↓
+BIDDING SESSION
+↓
+BUYERS SUBMIT SEALED OFFERS
+↓
+SESSION CLOSES
+↓
+ARTISAN REVIEWS OFFERS
+↓
+SELECTS SUITABLE BUYER(S)
+↓
+SELECTED OFFER
+↓
+NORMAL QUOTATION → ORDER FLOW
+
+34. BIDDING ACCESS CONTROL
+
+No public unlimited bidding.
+
+Only relevant/eligible buyers.
+
+Possible criteria:
+
+    ●​ Verified business
+    ●​ Relevant category
+    ●​ Relevant product interest
+    ●​ Trust/reliability signals
+    ●​ No serious risk flags
+Participation can be limited.
+
+35. BIDDING NOTIFICATIONS
+
+T - 2 Days
+→ Session scheduled
+T - 1 Hour
+→ Reminder
+T = Start
+→ Bidding Started
+During
+→ Relevant session updates
+T = End
+→ Session Closed
+After selection
+→ Result notification
+
+36. SEALED BIDDING
+
+Instead of a live price war:
+Buyer submits:
+
+    ●​ Quantity required
+    ●​ Price offered
+    ●​ Relevant terms
+Then the session closes.
+
+37. ARTISAN CONTROLS FINAL
+SELECTION
+
+Highest price does not automatically have to win.
+Artisan can consider:
+    ●​ Price
+    ●​ Quantity
+    ●​ Buyer reliability/trust
+    ●​ Requirement fit
+
+Artisan can:
+    ●​ Select one buyer
+    ●​ Select multiple buyers
+    ●​ Split quantity
+    ●​ Reject all
+
+38. PRICE PROTECTION
+
+Minimum acceptable price is controlled by artisan.
+It can be informed by:
+AI Pricing Assistant → suggested sustainable range → artisan decides threshold
+No forced downward pricing.
+
+39. BIDDING FAILURE CASES
+
+No acceptable bids
+
+Product returns to normal B2B availability.
+
+Buyer backs out
+
+Next suitable offer / normal B2B.
+
+Artisan rejects all
+
+Session closes without order.
+
+Multiple buyers
+
+Quantity may be split where appropriate.
+40. BUSINESS INSIGHTS
+
+This is our lightweight ongoing Virtual Business Manager.
+
+After publishing, artisan gets simple information:
+
+    ●​ Product views
+    ●​ Buyer interest
+    ●​ Inquiries
+    ●​ Common buyer requests
+    ●​ Basic product performance
+
+AI can give actionable suggestions.
+
+Example:
+
+        “3 buyers asked for more than 100 pieces.”
+
+        “Your product received 40 views this week.”
+
+        “You may want to review your MOQ.”
+
+Artisan decides whether to change anything.
+
+41. MARKETPLACE / GOVERNMENT
+CONNECTION
+
+Seller-side linkage
+
+Product
+↓
+AI Catalog
+↓
+Standard Product Information
+↓
+Marketplace-ready
+↓
+Supported Channel
+
+Where an official API/approved integration exists:
+
+Connect / Publish / Sync
+Otherwise:
+Prepare + Guided onboarding/submission
+
+Buyer-side linkage
+
+Buyer requirement can potentially be connected to permitted external sources where the
+relevant integration/data access exists.
+We do not assume every platform provides an API.
+
+42. ADMIN WEB DASHBOARD
+
+Separate web dashboard using the same backend/database.
+
+User Management
+
+    ●​ Artisan accounts
+    ●​ Buyer accounts
+    ●​ Status
+
+Verification
+
+    ●​ Artisan verification
+    ●​ Buyer verification
+    ●​ Approve
+    ●​ Reject
+    ●​ Request correction
+
+Product Moderation
+
+    ●​ Flagged listings
+    ●​ AI-output issues
+    ●​ Content review
+
+B2B Monitoring
+
+    ●​ Requirements
+    ●​ Inquiries
+    ●​ Quotes
+    ●​ Orders
+    ●​ Activity
+Bidding Monitoring
+
+    ●​ Scheduled
+    ●​ Active
+    ●​ Completed
+    ●​ Reported
+    ●​ Suspicious sessions/activity
+
+Trust & Safety
+
+    ●​ Risk signals
+    ●​ Reports
+    ●​ Suspicious accounts
+    ●​ Restrictions
+
+Dispute Resolution
+
+    ●​ Complaint
+    ●​ Evidence
+    ●​ Review
+    ●​ Resolution
+
+Marketplace / Integration Management
+
+    ●​ Connection status
+    ●​ Sync status
+    ●​ Errors
+
+Ecosystem Analytics
+
+    ●​ Artisan onboarding
+    ●​ Products published
+    ●​ B2B requirements
+    ●​ Connections
+    ●​ Orders
+    ●​ Conversion
+    ●​ Category/region activity
+

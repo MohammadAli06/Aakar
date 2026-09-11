@@ -97,7 +97,7 @@ class _VoiceInputButtonState extends State<VoiceInputButton>
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: widget.isListening
-                        ? [AppColors.accentRed, Color(0xFFFF6B6B)]
+                        ? [AppColors.accentRed, AppColors.error]
                         : [AppColors.primary, AppColors.secondary],
                   ),
                   boxShadow: [

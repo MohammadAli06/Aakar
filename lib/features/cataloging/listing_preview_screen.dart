@@ -226,7 +226,7 @@ class _ListingPreviewScreenState extends State<ListingPreviewScreen>
                                   colors: _approved
                                       ? [
                                           AppColors.accentGreen,
-                                          const Color(0xFF059669)
+                                          AppColors.success
                                         ]
                                       : [
                                           AppColors.primary,

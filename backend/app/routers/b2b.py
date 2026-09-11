@@ -199,8 +199,8 @@ async def connect_to_channel(
 
     # Simulate submission
     return {
-        "status": "submitted",
+        "status": "prepared_demo",
         "channel": DEMO_CHANNELS[channel_id]["name"],
-        "message": "Your listing has been submitted to the channel. Buyers will contact you within 3–5 business days.",
-        "message_hi": "आपकी listing channel को भेज दी गई है। खरीदार 3–5 दिनों में संपर्क करेंगे।",
+        "message": "Demo preparation complete. No submission was made to the external channel. Follow the channel's official onboarding process.",
+        "message_hi": "डेमो तैयारी पूरी हुई। बाहरी चैनल पर सबमिशन नहीं हुआ। आधिकारिक ऑनबोर्डिंग प्रक्रिया पूरी करें।",
     }

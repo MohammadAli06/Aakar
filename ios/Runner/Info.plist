@@ -2,6 +2,14 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Speak product details, requirements and corrections.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Turn your spoken craft details into editable text.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Photograph your products and order progress.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Choose product photos and order evidence.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

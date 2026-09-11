@@ -8,6 +8,9 @@ class Settings(BaseSettings):
     APP_NAME: str = "Aakar API"
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
+    ENABLE_DEMO_WORKSPACE: bool = False
+    WORKSPACE_DEMO_TOKEN: Optional[str] = None
+    ADMIN_ACCESS_TOKEN: Optional[str] = None
 
     # Database
     DATABASE_URL: str = "postgresql+asyncpg://craftconnect:craftconnect@localhost:5432/craftconnect"
@@ -31,6 +34,7 @@ class Settings(BaseSettings):
 
     # Bhashini ASR
     BHASHINI_API_KEY: Optional[str] = None
+    SARVAM_API_KEY: Optional[str] = None
     BHASHINI_ASR_URL: str = "https://dhruva-api.bhashini.gov.in/services/inference/pipeline"
 
     # JWT

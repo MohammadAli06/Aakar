@@ -27,7 +27,7 @@ class _B2BScreenState extends State<B2BScreen> {
       nameHi: 'सरकारी ई-मार्केट',
       desc: 'Government e-Marketplace',
       emoji: '🏛️',
-      color: Color(0xFF2563EB),
+      color: AppColors.info,
     ),
     _Channel(
       id: 'ondc',
@@ -35,7 +35,7 @@ class _B2BScreenState extends State<B2BScreen> {
       nameHi: 'राष्ट्रीय डिजिटल व्यापार',
       desc: 'Open Network for Digital Commerce',
       emoji: '🌐',
-      color: Color(0xFF7C3AED),
+      color: AppColors.secondary,
     ),
     _Channel(
       id: 'state_board',
@@ -43,7 +43,7 @@ class _B2BScreenState extends State<B2BScreen> {
       nameHi: 'राज्य हस्तशिल्प बोर्ड',
       desc: 'Rajasthan / Maharashtra / etc.',
       emoji: '🎨',
-      color: Color(0xFFD97706),
+      color: AppColors.accent,
     ),
   ];
 
@@ -94,10 +94,13 @@ class _B2BScreenState extends State<B2BScreen> {
             Container(
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
+                gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [Color(0xFF1A0F40), Color(0xFF0F1040)],
+                  colors: [
+                    AppColors.primary.withOpacity(0.25),
+                    AppColors.secondary.withOpacity(0.2)
+                  ],
                 ),
                 borderRadius: BorderRadius.circular(18),
                 border: Border.all(color: AppColors.secondary.withOpacity(0.3)),
@@ -369,7 +372,7 @@ class _B2BScreenState extends State<B2BScreen> {
                               fontWeight: FontWeight.w700,
                               color: AppColors.textPrimary)),
                       content: const AppText(
-                        'आपका listing B2B channel पर भेज दिया गया है। खरीदार जल्द संपर्क करेंगे।\n\nYour listing has been submitted. Buyers will contact you soon.',
+                        'डेमो जानकारी तैयार है। बाहरी चैनल पर कुछ नहीं भेजा गया है।\n\nDemo information prepared. No external submission has been made.',
                         style: TextStyle(
                             fontFamily: 'Poppins',
                             fontSize: 13,
@@ -392,7 +395,7 @@ class _B2BScreenState extends State<B2BScreen> {
                   height: 56,
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                        colors: [AppColors.secondary, Color(0xFF8A84FF)]),
+                        colors: [AppColors.secondary, AppColors.primaryLight]),
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(

@@ -26,7 +26,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           'बस अपने उत्पाद की फोटो लें। हमारी AI उसे e-commerce के लिए तैयार कर देगी — बैकग्राउंड, रोशनी, सब कुछ।',
       descEn:
           'Just click a photo. Our AI makes it e-commerce ready — background, lighting, everything.',
-      gradient: [Color(0xFFFF6B35), Color(0xFFFF8A5B)],
+      gradient: [AppColors.primary, AppColors.primaryLight],
     ),
     _OnboardingSlide(
       icon: Icons.mic_rounded,
@@ -37,7 +37,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           'अपनी भाषा में बताएं अपना उत्पाद। AI सुनेगा, समझेगा, और Hindi-English में listing तैयार करेगा।',
       descEn:
           'Describe in your language. AI listens, understands, and builds your bilingual listing.',
-      gradient: [Color(0xFF6C63FF), Color(0xFF8A84FF)],
+      gradient: [AppColors.secondary, AppColors.secondaryDark],
     ),
     _OnboardingSlide(
       icon: Icons.price_check_rounded,
@@ -48,7 +48,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           'AI आपकी मेहनत की लागत देखकर कीमत सुझाएगा — मशीन-निर्मित सामान से तुलना नहीं, बस हस्तशिल्प से।',
       descEn:
           'AI suggests prices respecting your labour — compared only to handmade, never to machine-made.',
-      gradient: [Color(0xFFF59E0B), Color(0xFFFF6B35)],
+      gradient: [AppColors.accent, AppColors.primary],
     ),
   ];
 

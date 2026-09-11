@@ -204,10 +204,13 @@ class _PricingScreenState extends State<PricingScreen> {
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
+                  gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [Color(0xFF1A0F00), Color(0xFF1A1000)],
+                    colors: [
+                      AppColors.primary.withOpacity(0.2),
+                      AppColors.secondary.withOpacity(0.15)
+                    ],
                   ),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: AppColors.accent.withOpacity(0.3)),
@@ -443,7 +446,7 @@ class _PricingScreenState extends State<PricingScreen> {
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: _approved
-                          ? [AppColors.accentGreen, const Color(0xFF059669)]
+                          ? [AppColors.accentGreen, AppColors.primary]
                           : [AppColors.primary, AppColors.secondary],
                     ),
                     borderRadius: BorderRadius.circular(16),
