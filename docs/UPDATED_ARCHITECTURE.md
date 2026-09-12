@@ -285,7 +285,7 @@ Example: fragile ceramic lamps → cushioning added, inner product secured, oute
 | Communication and negotiation barrier | AI business manager translates/simplifies formal buyer needs into regional voice/text and artisan replies into structured commercial terms |
 | B2B transaction risk | Optional sample, structured agreement/payment terms, advance checkpoint, production, optional progress review, delivery, inspection, manual issues, settlement/completion |
 | Fulfillment complexity | Packaging checklist/evidence → shipping reference → tracking → delivery; coordinate the process without operating physical logistics |
-| Ecosystem/marketplace fragmentation | Separate internal CraftConnect/Aakar readiness and per-external-channel readiness; automated push remains future absent approved access |
+| Ecosystem/marketplace fragmentation | Separate internal Aakar readiness and per-external-channel readiness; automated push remains future absent approved access |
 
 The final architecture joins artisan AI creation/catalog/verification/pricing and buyer requirement understanding/matching/selection through translation/voice and structured negotiation, then sample if needed, agreement/payment, production/progress review, packaging/dispatch/tracking, delivery/inspection, issue-to-admin branch, completion, and reorder. Readiness runs alongside this flow. Bidding remains future/optional, described as **Artisan-initiated Bulk Clearance**, e.g. 80 surplus baskets offered to eligible/pre-verified buyers. Core purpose remains digitization → capable matching → communication support → fulfillment and repeat supplier relationships.
 

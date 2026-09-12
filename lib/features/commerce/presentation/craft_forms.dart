@@ -6,6 +6,7 @@ import 'package:speech_to_text/speech_to_text.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import '../domain/commerce_engine.dart';
 import 'craft_widgets.dart';
+import '../../capture/capture_flow.dart';
 
 class CraftField {
   final String key, en, hi;
@@ -239,10 +240,13 @@ class _VoiceFieldButtonState extends State<VoiceFieldButton> {
 Future<String?> pickEvidence(BuildContext context,
     {bool camera = false}) async {
   try {
+    // Camera capture happens inside the app so the photo cannot be lost when
+    // Android reclaims the activity behind the device camera app.
+    if (camera) {
+      return await captureProductPhoto(context);
+    }
     final file = await ImagePicker().pickImage(
-        source: camera ? ImageSource.camera : ImageSource.gallery,
-        maxWidth: 1800,
-        imageQuality: 88);
+        source: ImageSource.gallery, maxWidth: 1800, imageQuality: 88);
     if (file == null) return null;
     final directory = await getApplicationDocumentsDirectory();
     final saved = await File(file.path).copy(
@@ -318,14 +322,4 @@ const productFields = [
   CraftField(
       'lead_days', 'Average production time (days)', 'औसत उत्पादन समय (दिन)',
       numeric: true),
-  CraftField('available', 'Available for orders', 'ऑर्डर के लिए उपलब्ध',
-      toggle: true),
-  CraftField('customizable', 'Customization supported', 'बदलाव कर सकते हैं',
-      toggle: true),
-  CraftField('fragile', 'Fragile / needs extra protection',
-      'नाज़ुक / अतिरिक्त सुरक्षा',
-      toggle: true),
-  CraftField('can_pack', 'I can package this safely',
-      'मैं सुरक्षित पैक कर सकता/सकती हूँ',
-      toggle: true)
 ];

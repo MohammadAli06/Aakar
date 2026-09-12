@@ -95,6 +95,15 @@ class CommerceRepository extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Applies the role of the signed-in account. Role is fixed at signup, so
+  /// this only ever follows the account — it is not a user-facing switch.
+  Future<void> applyAccountRole(String value) async {
+    if (role == value) return;
+    role = value;
+    await _persist();
+    notifyListeners();
+  }
+
   Future<void> switchArtisan(String value) async {
     artisanId = value;
     await _persist();

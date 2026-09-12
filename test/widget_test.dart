@@ -1,10 +1,13 @@
 import 'package:craft_connect/app.dart';
 import 'package:craft_connect/core/routing/app_router.dart';
 import 'package:craft_connect/core/services/app_providers.dart';
+import 'package:craft_connect/shared/models/account.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'test_session_helper.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -18,7 +21,12 @@ void main() {
   });
 
   Future<ProviderContainer> start(
-      WidgetTester tester, String language, String route) async {
+    WidgetTester tester,
+    String language,
+    String route, {
+    AccountRole? asRole,
+    bool completeProfile = true,
+  }) async {
     tester.view.physicalSize = const Size(430, 1000);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -26,6 +34,9 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     final container = ProviderContainer(overrides: [
       selectedLanguageProvider.overrideWith((ref) => language),
+      sessionProvider.overrideWith((ref) => asRole == null
+          ? signedOutSession()
+          : signedInSession(asRole, complete: completeProfile)),
     ]);
     final router = container.read(appRouterProvider);
     router.go(route);
@@ -55,7 +66,7 @@ void main() {
     expect(await loadSelectedLanguage(), 'en');
     await tester.tap(find.text('Skip'));
     await tester.pumpAndSettle();
-    expect(find.text('Hello! 👋'), findsOneWidget);
+    expect(find.text('Welcome to Aakar'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -72,18 +83,26 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Dashboard can switch language and return to the same route',
+  testWidgets('Signed-out visitor is sent to common phone sign-in',
       (tester) async {
     await start(tester, 'en', '/dashboard');
-    expect(find.text('My Products'), findsOneWidget);
+    expect(find.text('Welcome to Aakar'), findsOneWidget);
+    expect(find.text('Mobile number'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Dashboard can switch language and return to the same route',
+      (tester) async {
+    await start(tester, 'en', '/dashboard', asRole: AccountRole.artisan);
+    expect(find.byType(NavigationBar), findsOneWidget);
     await tester.tap(find.byIcon(Icons.language));
     await tester.pumpAndSettle();
     await tester.tap(find.text('हिंदी'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('आगे बढ़ें  →'));
     await tester.pumpAndSettle();
-    expect(find.text('मेरे उत्पाद'), findsOneWidget);
-    expect(find.text('My Products'), findsNothing);
+    expect(find.byType(NavigationBar), findsOneWidget);
+    expect(find.text('Your account'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -96,15 +115,18 @@ void main() {
   });
 
   for (final route in {
-    '/profile-setup': ['What is your name?', 'आपका नाम क्या है?'],
-    '/photo-capture': ['Photo Capture', 'फोटो कैप्चर'],
-    '/cataloging': ['Smart Catalog', 'स्मार्ट कैटालॉग'],
-    '/pricing': ['💰 Pricing', '💰 मूल्य निर्धारण'],
-    '/b2b': ['B2B / Government Marketplace', 'B2B / सरकारी बाज़ार'],
+    '/profile-setup': ['Tell us about yourself', 'अपने बारे में बताएँ'],
+    '/photo-capture': ['Your profile', 'आपकी प्रोफ़ाइल'],
+    '/cataloging': ['Your profile', 'आपकी प्रोफ़ाइल'],
+    '/pricing': ['Your profile', 'आपकी प्रोफ़ाइल'],
+    '/b2b': ['Your profile', 'आपकी प्रोफ़ाइल'],
   }.entries) {
     for (final language in ['en', 'hi']) {
       testWidgets('${route.key} follows $language', (tester) async {
-        await start(tester, language, route.key);
+        // An unfinished artisan profile keeps the guard on /profile-setup.
+        await start(tester, language, route.key,
+            asRole: AccountRole.artisan,
+            completeProfile: route.key != '/profile-setup');
         expect(
             find.text(route.value[language == 'en' ? 0 : 1]), findsOneWidget);
         expect(find.text(route.value[language == 'en' ? 1 : 0]), findsNothing);

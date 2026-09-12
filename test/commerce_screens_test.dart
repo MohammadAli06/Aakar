@@ -5,12 +5,15 @@ import 'package:craft_connect/app.dart';
 import 'package:craft_connect/core/routing/app_router.dart';
 import 'package:craft_connect/core/services/app_providers.dart';
 import 'package:craft_connect/features/commerce/domain/commerce_engine.dart';
+import 'package:craft_connect/shared/models/account.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'test_session_helper.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -117,7 +120,11 @@ void main() {
           'commerce_role': 'buyer'
         });
         final container = ProviderContainer(overrides: [
-          selectedLanguageProvider.overrideWith((ref) => language)
+          selectedLanguageProvider.overrideWith((ref) => language),
+          // The workspace is behind the auth guard now, so run as a signed-in
+          // buyer account (role is fixed at signup).
+          sessionProvider.overrideWith(
+              (ref) => signedInSession(AccountRole.buyer)),
         ]);
         final router = container.read(appRouterProvider);
         router.go('/workspace/$page');

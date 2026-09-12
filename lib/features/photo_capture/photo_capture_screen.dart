@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
-import '../../shared/widgets/glass_card.dart';
+import '../capture/capture_flow.dart';
 
 class PhotoCaptureScreen extends StatefulWidget {
   const PhotoCaptureScreen({super.key});
@@ -12,13 +12,10 @@ class PhotoCaptureScreen extends StatefulWidget {
   State<PhotoCaptureScreen> createState() => _PhotoCaptureScreenState();
 }
 
-class _PhotoCaptureScreenState extends State<PhotoCaptureScreen>
-    with SingleTickerProviderStateMixin {
+class _PhotoCaptureScreenState extends State<PhotoCaptureScreen> {
   final _picker = ImagePicker();
   bool _capturing = false;
-  late AnimationController _scanController;
 
-  // Live guidance tips
   static const _tips = [
     {
       'icon': '☀️',
@@ -30,32 +27,21 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen>
     {'icon': '📏', 'hi': '30-50 cm दूरी से', 'en': '30-50 cm distance'},
   ];
 
-  @override
-  void initState() {
-    super.initState();
-    _scanController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 2),
-    )..repeat();
-  }
-
-  @override
-  void dispose() {
-    _scanController.dispose();
-    super.dispose();
-  }
-
   Future<void> _captureImage(ImageSource source) async {
     setState(() => _capturing = true);
     try {
-      final file = await _picker.pickImage(
-        source: source,
-        imageQuality: 90,
-        maxWidth: 1920,
-        maxHeight: 1920,
-      );
-      if (file != null && mounted) {
-        context.push('/enhancement', extra: file.path);
+      // The camera opens inside the app — launching the device camera app can
+      // destroy the Flutter activity and lose the photo.
+      final String? path = source == ImageSource.camera
+          ? await captureProductPhoto(context)
+          : (await _picker.pickImage(
+                  source: ImageSource.gallery,
+                  imageQuality: 90,
+                  maxWidth: 1920,
+                  maxHeight: 1920))
+              ?.path;
+      if (path != null && mounted) {
+        context.push('/enhancement', extra: path);
       }
     } catch (e) {
       if (mounted) {
@@ -86,71 +72,36 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 8),
-              // Camera frame mockup
+              // Capture itself happens in the full-screen in-app camera.
               Container(
                 width: double.infinity,
-                height: 300,
+                padding:
+                    const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
                 decoration: BoxDecoration(
                   color: AppColors.surface,
                   borderRadius: BorderRadius.circular(24),
                   border: Border.all(color: AppColors.glassBorder, width: 1.5),
                 ),
-                child: Stack(
+                child: const Column(
                   children: [
-                    // Grid overlay
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(24),
-                      child: CustomPaint(
-                        painter: _GridPainter(),
-                        size: const Size(double.infinity, 300),
+                    Icon(Icons.camera_alt_outlined,
+                        size: 48, color: AppColors.primary),
+                    SizedBox(height: 12),
+                    AppText(
+                      'कैमरा इस ऐप के अंदर ही खुलेगा',
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 14,
+                        color: AppColors.textPrimary,
                       ),
                     ),
-                    // Corner brackets
-                    ..._buildCornerBrackets(),
-                    // Scan line animation
-                    AnimatedBuilder(
-                      animation: _scanController,
-                      builder: (_, __) => Positioned(
-                        top: 300 * _scanController.value - 2,
-                        left: 24,
-                        right: 24,
-                        child: Container(
-                          height: 2,
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [
-                                Colors.transparent,
-                                AppColors.primary,
-                                Colors.transparent
-                              ],
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                  color: AppColors.primary.withOpacity(0.5),
-                                  blurRadius: 6),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    // Center placeholder text
-                    Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.camera_alt_outlined,
-                              size: 48,
-                              color: AppColors.primary.withOpacity(0.5)),
-                          const SizedBox(height: 8),
-                          const AppText(
-                            'यहाँ उत्पाद दिखेगा',
-                            style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 14,
-                              color: AppColors.textHint,
-                            ),
-                          ),
-                        ],
+                    SizedBox(height: 4),
+                    AppText(
+                      'The camera opens inside the app',
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 12,
+                        color: AppColors.textHint,
                       ),
                     ),
                   ],
@@ -284,137 +235,4 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen>
       ),
     );
   }
-
-  List<Widget> _buildCornerBrackets() {
-    const size = 28.0;
-    const thickness = 3.0;
-    const color = AppColors.primary;
-    return [
-      // Top-left
-      Positioned(
-          top: 16,
-          left: 16,
-          child: _Corner(
-              size: size,
-              thickness: thickness,
-              color: color,
-              isTop: true,
-              isLeft: true)),
-      // Top-right
-      Positioned(
-          top: 16,
-          right: 16,
-          child: _Corner(
-              size: size,
-              thickness: thickness,
-              color: color,
-              isTop: true,
-              isLeft: false)),
-      // Bottom-left
-      Positioned(
-          bottom: 16,
-          left: 16,
-          child: _Corner(
-              size: size,
-              thickness: thickness,
-              color: color,
-              isTop: false,
-              isLeft: true)),
-      // Bottom-right
-      Positioned(
-          bottom: 16,
-          right: 16,
-          child: _Corner(
-              size: size,
-              thickness: thickness,
-              color: color,
-              isTop: false,
-              isLeft: false)),
-    ];
-  }
-}
-
-class _Corner extends StatelessWidget {
-  final double size;
-  final double thickness;
-  final Color color;
-  final bool isTop;
-  final bool isLeft;
-  const _Corner(
-      {required this.size,
-      required this.thickness,
-      required this.color,
-      required this.isTop,
-      required this.isLeft});
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: size,
-      height: size,
-      child: CustomPaint(
-        painter: _CornerPainter(
-            color: color, thickness: thickness, isTop: isTop, isLeft: isLeft),
-      ),
-    );
-  }
-}
-
-class _CornerPainter extends CustomPainter {
-  final Color color;
-  final double thickness;
-  final bool isTop;
-  final bool isLeft;
-
-  const _CornerPainter(
-      {required this.color,
-      required this.thickness,
-      required this.isTop,
-      required this.isLeft});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..strokeWidth = thickness
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke;
-    final double s = size.width;
-    if (isTop && isLeft) {
-      canvas.drawLine(const Offset(0, 0), Offset(s, 0), paint);
-      canvas.drawLine(const Offset(0, 0), Offset(0, s), paint);
-    } else if (isTop && !isLeft) {
-      canvas.drawLine(Offset(0, 0), Offset(s, 0), paint);
-      canvas.drawLine(Offset(s, 0), Offset(s, s), paint);
-    } else if (!isTop && isLeft) {
-      canvas.drawLine(Offset(0, 0), Offset(0, s), paint);
-      canvas.drawLine(Offset(0, s), Offset(s, s), paint);
-    } else {
-      canvas.drawLine(Offset(s, 0), Offset(s, s), paint);
-      canvas.drawLine(Offset(0, s), Offset(s, s), paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _GridPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = AppColors.glassBorder.withOpacity(0.3)
-      ..strokeWidth = 0.5;
-    canvas.drawLine(
-        Offset(size.width / 3, 0), Offset(size.width / 3, size.height), paint);
-    canvas.drawLine(Offset(size.width * 2 / 3, 0),
-        Offset(size.width * 2 / 3, size.height), paint);
-    canvas.drawLine(
-        Offset(0, size.height / 3), Offset(size.width, size.height / 3), paint);
-    canvas.drawLine(Offset(0, size.height * 2 / 3),
-        Offset(size.width, size.height * 2 / 3), paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

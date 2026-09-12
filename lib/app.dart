@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'core/theme/app_theme.dart';
+import 'core/theme/role_theme.dart';
 import 'core/services/app_providers.dart';
 import 'core/routing/app_router.dart';
 
@@ -15,7 +15,7 @@ class AakarApp extends ConsumerWidget {
       title: 'Aakar',
       locale: Locale(ref.watch(selectedLanguageProvider)),
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
+      theme: RoleTheme.forRole(ref.watch(sessionProvider).role),
       routerConfig: router,
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,

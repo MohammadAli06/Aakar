@@ -5,25 +5,45 @@ import unittest
 from io import BytesIO
 from pathlib import Path
 from PIL import Image
+from unittest.mock import patch
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 
 _test_root = Path(__file__).resolve().parent
 _directory = tempfile.TemporaryDirectory(prefix='runtime-', dir=_test_root)
 os.environ.update(DEBUG='false', ENVIRONMENT='development', ENABLE_DEMO_WORKSPACE='true', DATABASE_URL='sqlite+aiosqlite:///' + _directory.name.replace('\\', '/') + '/workspace.db', WORKSPACE_DEMO_TOKEN='test-mobile-only', ADMIN_ACCESS_TOKEN='test-admin-only')
 from fastapi.testclient import TestClient
-from main import app
+from main import create_app
 from app.core.config import settings
+from app.core.database import get_db
 
 
 class WorkspaceApiTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        # Explicit fixtures work regardless of which API test imports settings first.
+        engine = create_async_engine(os.environ['DATABASE_URL'])
+        sessions = async_sessionmaker(engine, expire_on_commit=False)
+        async def database():
+            async with sessions() as session:
+                yield session
+        cls.patches = [patch('main.engine', engine),
+                       patch.object(settings, 'ENABLE_DEMO_WORKSPACE', True),
+                       patch.object(settings, 'ENVIRONMENT', 'development'),
+                       patch.object(settings, 'WORKSPACE_DEMO_TOKEN', 'test-mobile-only'),
+                       patch.object(settings, 'ADMIN_ACCESS_TOKEN', 'test-admin-only'),
+                       patch.object(settings, 'LLM_API_KEY', None)]
+        for p in cls.patches:
+            p.start()
+        app = create_app()
+        app.dependency_overrides[get_db] = database
         cls.client = TestClient(app)
         cls.client.__enter__()
-        settings.LLM_API_KEY = None  # Never call a real AI provider from tests.
 
     @classmethod
     def tearDownClass(cls):
         cls.client.__exit__(None, None, None)
+        for p in reversed(cls.patches):
+            p.stop()
         Path(_directory.name).resolve().relative_to(_test_root)
         _directory.cleanup()
 

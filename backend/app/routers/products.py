@@ -1,22 +1,23 @@
 """
-Products Router — CRUD for products.
+Products Router — CRUD for products (artisan-owned).
 """
 import uuid
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from pydantic import BaseModel
-from typing import Optional, List
 from datetime import datetime
+from typing import List
 
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.auth_deps import require_artisan_profile
 from app.core.database import get_db
-from app.models.models import Product, ProductStatus, CraftCategory
+from app.models.models import Artisan, CraftCategory, Product, ProductStatus
 
 router = APIRouter()
 
 
 class ProductCreateRequest(BaseModel):
-    artisan_id: str
     category: str = "other"
 
 
@@ -34,13 +35,19 @@ class ProductResponse(BaseModel):
 @router.post("/", response_model=ProductResponse)
 async def create_product(
     data: ProductCreateRequest,
+    artisan: Artisan = Depends(require_artisan_profile),
     db: AsyncSession = Depends(get_db),
 ):
-    """Create a new product (draft). Called when artisan starts a new listing flow."""
+    """Create a draft product owned by the authenticated artisan."""
+    try:
+        category = CraftCategory(data.category)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Unknown craft category")
+
     product = Product(
         id=str(uuid.uuid4()),
-        artisan_id=data.artisan_id,
-        category=CraftCategory(data.category),
+        artisan_id=artisan.id,
+        category=category,
         status=ProductStatus.draft,
     )
     db.add(product)
@@ -49,16 +56,26 @@ async def create_product(
     return product
 
 
+@router.get("/", response_model=List[ProductResponse])
+async def list_my_products(
+    artisan: Artisan = Depends(require_artisan_profile),
+    db: AsyncSession = Depends(get_db),
+):
+    """List the authenticated artisan's own products."""
+    result = await db.execute(select(Product).where(Product.artisan_id == artisan.id))
+    return result.scalars().all()
+
+
 @router.get("/{product_id}", response_model=ProductResponse)
-async def get_product(product_id: str, db: AsyncSession = Depends(get_db)):
+async def get_product(
+    product_id: str,
+    artisan: Artisan = Depends(require_artisan_profile),
+    db: AsyncSession = Depends(get_db),
+):
     result = await db.execute(select(Product).where(Product.id == product_id))
     product = result.scalar_one_or_none()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
+    if product.artisan_id != artisan.id:
+        raise HTTPException(status_code=403, detail="Not your product")
     return product
-
-
-@router.get("/artisan/{artisan_id}", response_model=List[ProductResponse])
-async def list_artisan_products(artisan_id: str, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Product).where(Product.artisan_id == artisan_id))
-    return result.scalars().all()

@@ -100,7 +100,7 @@ def apply(original, action, data, role, actor):
     elif action == 'product':
         as_role('artisan')
         p = owned(find('products', data['id'])) if data.get('id') else dict(id=ident('product'), artisan_id=actor, status='draft', external={})
-        for k in ('title', 'title_hi', 'description_hi', 'description', 'category', 'craft', 'material', 'colour', 'dimensions', 'usage', 'story', 'price', 'material_cost', 'labour_cost', 'labour_hours', 'hourly_rate', 'complexity', 'overhead', 'moq', 'stock', 'capacity', 'lead_days', 'available', 'customizable', 'location', 'image', 'original_image', 'fragile', 'can_pack', 'transcript', 'approved'):
+        for k in ('title', 'title_hi', 'description_hi', 'description', 'category', 'craft', 'material', 'colour', 'dimensions', 'usage', 'story', 'price', 'material_cost', 'labour_cost', 'labour_hours', 'hourly_rate', 'complexity', 'overhead', 'moq', 'stock', 'capacity', 'lead_days', 'available', 'customizable', 'location', 'image', 'original_image', 'prepared', 'fragile', 'can_pack', 'transcript', 'approved'):
             if k in data:
                 p[k] = data[k]
         need(all(num(p.get(k)) >= 0 for k in ('price', 'material_cost', 'labour_cost', 'overhead', 'stock', 'capacity')), 'Costs and capacity cannot be negative')

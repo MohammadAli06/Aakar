@@ -8,8 +8,10 @@ from sqlalchemy import select
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 
+from app.core.auth_deps import get_current_user, require_artisan_profile
 from app.core.database import get_db
-from app.models.models import B2BChannel, B2BReadiness, B2BStatus
+from app.core.ownership import load_owned_product
+from app.models.models import Artisan, B2BChannel, B2BReadiness, B2BStatus, User
 
 router = APIRouter()
 
@@ -89,7 +91,7 @@ class FillFieldRequest(BaseModel):
 
 
 @router.get("/channels")
-async def list_channels():
+async def list_channels(user: User = Depends(get_current_user)):
     """List all available B2B channels with their names and descriptions."""
     return [
         {
@@ -105,12 +107,15 @@ async def list_channels():
 @router.post("/check-readiness", response_model=ReadinessResponse)
 async def check_readiness(
     data: ReadinessCheckRequest,
+    artisan: Artisan = Depends(require_artisan_profile),
     db: AsyncSession = Depends(get_db),
 ):
     """
     Rule-engine check: given available fields vs. channel requirements.
     Returns a readiness score and plain-language prompts for each gap.
     """
+    await load_owned_product(db, data.product_id, artisan)
+
     channel = DEMO_CHANNELS.get(data.channel_id)
     if not channel:
         raise HTTPException(status_code=404, detail="Channel not found")
@@ -176,12 +181,15 @@ async def check_readiness(
 async def connect_to_channel(
     product_id: str,
     channel_id: str,
+    artisan: Artisan = Depends(require_artisan_profile),
     db: AsyncSession = Depends(get_db),
 ):
     """
     Trigger B2B connection request — packages the listing and submits to channel.
     In production: calls the actual GeM/ONDC API or submits to a portal queue.
     """
+    await load_owned_product(db, product_id, artisan)
+
     result = await db.execute(
         select(B2BReadiness).where(
             B2BReadiness.product_id == product_id,

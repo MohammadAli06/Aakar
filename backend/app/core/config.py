@@ -16,11 +16,13 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+asyncpg://craftconnect:craftconnect@localhost:5432/craftconnect"
 
     # Firebase Admin SDK
+    # Token verification requires a service account key from the Firebase
+    # project that issued the app's google-services.json (project `aakar-sih`).
     FIREBASE_CREDENTIALS_PATH: Optional[str] = None
-    FIREBASE_PROJECT_ID: str = "craftconnect-sih26"
+    FIREBASE_PROJECT_ID: str = "aakar-sih"
 
     # Storage (Firebase / S3)
-    FIREBASE_STORAGE_BUCKET: str = "craftconnect-sih26.appspot.com"
+    FIREBASE_STORAGE_BUCKET: str = "aakar-sih.firebasestorage.app"
 
     # Redis (Celery broker)
     REDIS_URL: str = "redis://localhost:6379/0"

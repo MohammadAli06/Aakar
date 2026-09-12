@@ -1,358 +1,258 @@
-import '../../core/localization/app_strings.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../../core/theme/app_colors.dart';
-import '../../shared/models/models.dart';
+import '../../core/localization/app_strings.dart';
+import '../../core/services/app_providers.dart';
+import '../../shared/models/account.dart';
 
-class ProfileSetupScreen extends StatefulWidget {
-  const ProfileSetupScreen({super.key});
-
+class ProfileSetupScreen extends ConsumerStatefulWidget {
+  final bool editing;
+  const ProfileSetupScreen({super.key, this.editing = false});
   @override
-  State<ProfileSetupScreen> createState() => _ProfileSetupScreenState();
+  ConsumerState<ProfileSetupScreen> createState() => _ProfileSetupScreenState();
 }
 
-class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
-  final _nameController = TextEditingController();
-  CraftCategory _selectedCategory = CraftCategory.pottery;
-  String _selectedState = 'Rajasthan';
-  int _step = 0;
+class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
+  final _form = GlobalKey<FormState>();
+  final _name = TextEditingController();
+  final _business = TextEditingController();
+  final _state = TextEditingController();
+  final _district = TextEditingController();
+  String _craft = 'other';
+  String _type = 'retailer';
+  String _industry = 'handicrafts';
   bool _saving = false;
-
-  static const _craftCategories = [
-    {
-      'category': CraftCategory.pottery,
-      'icon': '🏺',
-      'labelHi': 'कुम्हारी',
-      'labelEn': 'Pottery'
-    },
-    {
-      'category': CraftCategory.weaving,
-      'icon': '🧵',
-      'labelHi': 'बुनाई',
-      'labelEn': 'Weaving'
-    },
-    {
-      'category': CraftCategory.embroidery,
-      'icon': '🪡',
-      'labelHi': 'कढ़ाई',
-      'labelEn': 'Embroidery'
-    },
-    {
-      'category': CraftCategory.woodcraft,
-      'icon': '🪵',
-      'labelHi': 'लकड़ी',
-      'labelEn': 'Woodcraft'
-    },
-    {
-      'category': CraftCategory.metalcraft,
-      'icon': '⚙️',
-      'labelHi': 'धातु',
-      'labelEn': 'Metalcraft'
-    },
-    {
-      'category': CraftCategory.painting,
-      'icon': '🎨',
-      'labelHi': 'चित्रकारी',
-      'labelEn': 'Painting'
-    },
-    {
-      'category': CraftCategory.leathercraft,
-      'icon': '👜',
-      'labelHi': 'चर्म',
-      'labelEn': 'Leather'
-    },
-    {
-      'category': CraftCategory.jewelry,
-      'icon': '💍',
-      'labelHi': 'आभूषण',
-      'labelEn': 'Jewelry'
-    },
-  ];
-
-  static const _states = [
-    'Rajasthan',
-    'Uttar Pradesh',
-    'Gujarat',
-    'West Bengal',
-    'Madhya Pradesh',
-    'Odisha',
-    'Tamil Nadu',
-    'Karnataka',
-    'Maharashtra',
-    'Assam',
-    'Other',
-  ];
-
-  Future<void> _save() async {
-    if (_nameController.text.trim().isEmpty) return;
-    setState(() => _saving = true);
-    await Future.delayed(const Duration(seconds: 1));
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('profile_setup_done', true);
-    await prefs.setString('artisan_name', _nameController.text.trim());
-    await prefs.setString('craft_category', _selectedCategory.name);
-    await prefs.setString('artisan_state', _selectedState);
-    setState(() => _saving = false);
-    if (mounted) context.go('/dashboard');
+  String? _error;
+  String t(String en, String hi) => context.isHindi ? hi : en;
+  @override
+  void initState() {
+    super.initState();
+    final a = ref.read(sessionProvider).account;
+    _name.text = a?.name ?? '';
+    _business.text = a?.businessName ?? '';
+    _state.text = a?.state ?? '';
+    _district.text = a?.profile['district'] as String? ?? '';
+    _craft = a?.craftCategory ?? 'other';
+    _type = a?.profile['business_type'] as String? ?? 'retailer';
+    _industry = a?.profile['industry'] as String? ?? 'handicrafts';
   }
 
   @override
   void dispose() {
-    _nameController.dispose();
+    for (final c in [_name, _business, _state, _district]) {
+      c.dispose();
+    }
     super.dispose();
+  }
+
+  Future<void> _save(bool artisan) async {
+    if (!_form.currentState!.validate()) return;
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      final api = ref.read(accountServiceProvider);
+      final language = ref.read(selectedLanguageProvider);
+      if (artisan) {
+        await api.updateArtisanProfile(
+            name: _name.text.trim(),
+            state: _state.text.trim(),
+            district: _district.text.trim(),
+            craftCategory: _craft,
+            languagePref: language);
+      } else {
+        await api.updateBuyerProfile(
+            name: _name.text.trim(),
+            businessName: _business.text.trim(),
+            businessType: _type,
+            industry: _industry,
+            state: _state.text.trim(),
+            district: _district.text.trim(),
+            languagePref: language);
+      }
+      await ref.read(sessionProvider).refresh();
+      if (mounted) context.go('/verification');
+    } catch (_) {
+      if (mounted)
+        setState(() => _error = t(
+            'Your profile could not be saved. Check your connection and retry.',
+            'प्रोफ़ाइल सहेज नहीं सके। कनेक्शन जाँचकर फिर कोशिश करें।'));
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final artisan = ref.watch(sessionProvider).role == AccountRole.artisan;
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
-        leading: _step > 0
-            ? IconButton(
-                icon: const Icon(Icons.arrow_back_ios_rounded),
-                onPressed: () => setState(() => _step--),
-              )
-            : null,
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: List.generate(
-              2,
-              (i) => Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 4),
-                    width: i == _step ? 24 : 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(4),
-                      color: i == _step
-                          ? AppColors.primary
-                          : AppColors.surfaceHighlight,
-                    ),
-                  )),
-        ),
+        leading: BackButton(onPressed: _saving ? null : _back),
+        title: Text(t('Create profile', 'प्रोफ़ाइल बनाएँ')),
       ),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: _step == 0 ? _buildStep0() : _buildStep1(),
-        ),
-      ),
+          child: Center(
+              child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 520),
+                  child: Form(
+                      key: _form,
+                      child: ListView(
+                        padding: const EdgeInsets.all(24),
+                        children: [
+                          Text(
+                              t('01  PROFILE     /     02  VERIFICATION',
+                                  '01  प्रोफ़ाइल     /     02  सत्यापन'),
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  letterSpacing: 1,
+                                  color:
+                                      Theme.of(context).colorScheme.primary)),
+                          const SizedBox(height: 28),
+                          Icon(
+                              artisan
+                                  ? Icons.spa_outlined
+                                  : Icons.storefront_outlined,
+                              size: 48,
+                              color: Theme.of(context).colorScheme.primary),
+                          const SizedBox(height: 24),
+                          Text(
+                              artisan
+                                  ? t('Tell us about yourself',
+                                      'अपने बारे में बताएँ')
+                                  : t('Tell us about your business',
+                                      'अपने व्यवसाय के बारे में बताएँ'),
+                              style: const TextStyle(
+                                  fontSize: 28, fontWeight: FontWeight.w700)),
+                          const SizedBox(height: 10),
+                          Text(artisan
+                              ? t('Let your craftsmanship find its people.',
+                                  'अपनी कला को नई पहचान दें।')
+                              : t('Build lasting connections with skilled makers.',
+                                  'कुशल कारीगरों के साथ भरोसेमंद संबंध बनाएँ।')),
+                          const SizedBox(height: 28),
+                          _field(_name, t('Your name', 'आपका नाम'),
+                              Icons.person_outline),
+                          if (!artisan) ...[
+                            _field(
+                                _business,
+                                t('Business name', 'व्यवसाय का नाम'),
+                                Icons.business_outlined),
+                            _dropdown(
+                                t('Business type', 'व्यवसाय का प्रकार'),
+                                _type,
+                                {
+                                  'retailer': t('Retailer', 'खुदरा विक्रेता'),
+                                  'wholesaler': t('Wholesaler', 'थोक विक्रेता'),
+                                  'exporter': t('Exporter', 'निर्यातक'),
+                                  'hospitality': t('Hospitality', 'आतिथ्य'),
+                                  'corporate': t('Corporate / Gifting',
+                                      'कॉर्पोरेट / उपहार'),
+                                  'other': t('Other', 'अन्य')
+                                },
+                                (v) => _type = v),
+                            _dropdown(
+                                t('Industry', 'उद्योग'),
+                                _industry,
+                                {
+                                  'handicrafts': t('Handicrafts', 'हस्तशिल्प'),
+                                  'home_decor': t('Home décor', 'गृह सजावट'),
+                                  'fashion':
+                                      t('Fashion / Textiles', 'फ़ैशन / वस्त्र'),
+                                  'food_service':
+                                      t('Food service', 'खाद्य सेवा'),
+                                  'gifting': t('Gifting', 'उपहार'),
+                                  'other': t('Other', 'अन्य')
+                                },
+                                (v) => _industry = v),
+                          ],
+                          if (artisan)
+                            _dropdown(
+                                t('Your craft', 'आपकी कला'),
+                                _craft,
+                                {
+                                  'pottery': t('Pottery', 'मिट्टी के बर्तन'),
+                                  'weaving': t('Weaving', 'बुनाई'),
+                                  'embroidery': t('Embroidery', 'कढ़ाई'),
+                                  'woodcraft': t('Woodcraft', 'लकड़ी की कला'),
+                                  'metalcraft': t('Metalcraft', 'धातु कला'),
+                                  'painting': t('Painting', 'चित्रकारी'),
+                                  'leathercraft':
+                                      t('Leathercraft', 'चर्म शिल्प'),
+                                  'jewelry': t('Jewelry', 'आभूषण'),
+                                  'other': t('Other', 'अन्य')
+                                },
+                                (v) => _craft = v),
+                          _field(
+                              _state,
+                              t('State / Union territory',
+                                  'राज्य / केंद्र शासित प्रदेश'),
+                              Icons.location_on_outlined),
+                          _field(_district, t('City / District', 'शहर / जिला'),
+                              Icons.location_city_outlined),
+                          if (_error != null)
+                            Padding(
+                                padding: const EdgeInsets.only(bottom: 16),
+                                child: Text(_error!,
+                                    style: TextStyle(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .error))),
+                          const SizedBox(height: 12),
+                          FilledButton(
+                              onPressed: _saving ? null : () => _save(artisan),
+                              child: Text(_saving
+                                  ? t('Saving…', 'सहेज रहे हैं…')
+                                  : t('Save and continue',
+                                      'सहेजें और आगे बढ़ें'))),
+                          const SizedBox(height: 24),
+                        ],
+                      ))))),
     );
   }
 
-  Widget _buildStep0() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 24),
-        const AppText(
-          'आपका नाम क्या है?',
-          style: TextStyle(
-              fontFamily: 'Poppins',
-              fontSize: 26,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary),
-        ),
-        const SizedBox(height: 6),
-        const SizedBox(height: 32),
-        TextField(
-          controller: _nameController,
-          style: const TextStyle(
-              fontFamily: 'Poppins',
-              fontSize: 22,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary),
-          decoration: InputDecoration(
-            hintText: context.isHindi ? 'राम लाल' : 'Ramesh Kumar',
-            hintStyle: const TextStyle(
-                fontFamily: 'Poppins', fontSize: 18, color: AppColors.textHint),
-            prefixIcon: const Padding(
-              padding: EdgeInsets.all(16),
-              child: AppText('👤', style: TextStyle(fontSize: 20)),
-            ),
-          ),
-          textCapitalization: TextCapitalization.words,
-        ),
-        const SizedBox(height: 16),
-        // State selector
-        const AppText('राज्य / State',
-            style: TextStyle(
-                fontFamily: 'Poppins',
-                fontSize: 14,
-                color: AppColors.textSecondary)),
-        const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.glassBorder),
-          ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: _selectedState,
+  Future<void> _back() async {
+    if (_saving) return;
+    if (widget.editing) {
+      context.go('/dashboard');
+      return;
+    }
+    try {
+      await ref.read(sessionProvider).signOut();
+      if (mounted) context.go('/auth');
+    } catch (_) {
+      if (mounted)
+        setState(() => _error = t('Could not go back. Please try again.',
+            'वापस नहीं जा सके। फिर कोशिश करें।'));
+    }
+  }
+
+  Widget _field(
+          TextEditingController controller, String label, IconData icon) =>
+      Padding(
+          padding: const EdgeInsets.only(bottom: 18),
+          child: TextFormField(
+              controller: controller,
+              enabled: !_saving,
+              maxLength: 100,
+              textCapitalization: TextCapitalization.words,
+              textInputAction: TextInputAction.next,
+              validator: (v) => (v?.trim().isEmpty ?? true)
+                  ? t('Please complete this field', 'यह जानकारी भरें')
+                  : null,
+              decoration: InputDecoration(
+                  labelText: label, prefixIcon: Icon(icon), counterText: '')));
+  Widget _dropdown(String label, String value, Map<String, String> items,
+          ValueChanged<String> update) =>
+      Padding(
+          padding: const EdgeInsets.only(bottom: 18),
+          child: DropdownButtonFormField<String>(
+              initialValue: items.containsKey(value) ? value : 'other',
               isExpanded: true,
-              dropdownColor: AppColors.surface,
-              style: const TextStyle(
-                  fontFamily: 'Poppins',
-                  fontSize: 15,
-                  color: AppColors.textPrimary),
-              items: _states
-                  .map((s) => DropdownMenuItem(value: s, child: AppText(s)))
+              decoration: InputDecoration(labelText: label),
+              items: items.entries
+                  .map((e) =>
+                      DropdownMenuItem(value: e.key, child: Text(e.value)))
                   .toList(),
-              onChanged: (v) => setState(() => _selectedState = v!),
-            ),
-          ),
-        ),
-        const Spacer(),
-        GestureDetector(
-          onTap: () {
-            if (_nameController.text.trim().isEmpty) return;
-            setState(() => _step = 1);
-          },
-          child: Container(
-            height: 56,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                  colors: [AppColors.primary, AppColors.secondary]),
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                    color: AppColors.primary.withOpacity(0.35),
-                    blurRadius: 20,
-                    offset: const Offset(0, 6))
-              ],
-            ),
-            child: const Center(
-              child: AppText('अगला →',
-                  style: TextStyle(
-                      fontFamily: 'Poppins',
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white)),
-            ),
-          ),
-        ),
-        const SizedBox(height: 32),
-      ],
-    );
-  }
-
-  Widget _buildStep1() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 24),
-        const AppText(
-          'आपकी कला?',
-          style: TextStyle(
-              fontFamily: 'Poppins',
-              fontSize: 26,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary),
-        ),
-        const SizedBox(height: 4),
-        const AppText('Select your craft category',
-            style: TextStyle(
-                fontFamily: 'Poppins',
-                fontSize: 13,
-                color: AppColors.textHint)),
-        const SizedBox(height: 24),
-        Expanded(
-          child: GridView.builder(
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-              childAspectRatio: 1.4,
-            ),
-            itemCount: _craftCategories.length,
-            itemBuilder: (context, i) {
-              final c = _craftCategories[i];
-              final cat = c['category'] as CraftCategory;
-              final isSelected = _selectedCategory == cat;
-              return GestureDetector(
-                onTap: () => setState(() => _selectedCategory = cat),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  decoration: BoxDecoration(
-                    gradient: isSelected
-                        ? const LinearGradient(
-                            colors: [AppColors.primary, AppColors.secondary],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight)
-                        : null,
-                    color: isSelected ? null : AppColors.surface,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                        color: isSelected
-                            ? Colors.transparent
-                            : AppColors.glassBorder,
-                        width: 1.5),
-                    boxShadow: isSelected
-                        ? [
-                            BoxShadow(
-                                color: AppColors.primary.withOpacity(0.3),
-                                blurRadius: 12,
-                                spreadRadius: 1)
-                          ]
-                        : null,
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      AppText(c['icon'] as String,
-                          style: const TextStyle(fontSize: 32)),
-                      const SizedBox(height: 6),
-                      AppText(c['labelHi'] as String,
-                          style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: isSelected
-                                  ? Colors.white
-                                  : AppColors.textPrimary)),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-        const SizedBox(height: 16),
-        GestureDetector(
-          onTap: _saving ? null : _save,
-          child: Container(
-            height: 56,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                  colors: [AppColors.primary, AppColors.secondary]),
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                    color: AppColors.primary.withOpacity(0.35),
-                    blurRadius: 20,
-                    offset: const Offset(0, 6))
-              ],
-            ),
-            child: Center(
-              child: _saving
-                  ? const SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(
-                          color: Colors.white, strokeWidth: 2.5))
-                  : const AppText('शुरू करें 🎨',
-                      style: TextStyle(
-                          fontFamily: 'Poppins',
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white)),
-            ),
-          ),
-        ),
-        const SizedBox(height: 32),
-      ],
-    );
-  }
+              onChanged: _saving ? null : (v) => setState(() => update(v!))));
 }

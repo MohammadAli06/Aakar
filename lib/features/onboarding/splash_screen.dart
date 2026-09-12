@@ -1,17 +1,20 @@
 import '../../core/localization/app_strings.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/services/app_providers.dart';
+import '../../core/services/session_controller.dart';
 import '../../core/theme/app_colors.dart';
 
-class SplashScreen extends StatefulWidget {
+class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
 
   @override
-  State<SplashScreen> createState() => _SplashScreenState();
+  ConsumerState<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen>
+class _SplashScreenState extends ConsumerState<SplashScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
@@ -46,7 +49,7 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _navigateAfterDelay() async {
-    await Future.delayed(const Duration(milliseconds: 3000));
+    await Future.delayed(const Duration(milliseconds: 2600));
     if (!mounted) return;
 
     final prefs = await SharedPreferences.getInstance();
@@ -56,15 +59,33 @@ class _SplashScreenState extends State<SplashScreen>
     if (!mounted) return;
     if (languageSelected == null) {
       context.go('/language');
-    } else if (!onboardingDone) {
+      return;
+    }
+    if (!onboardingDone) {
       context.go('/onboarding');
-    } else {
-      final authToken = prefs.getString('auth_token');
-      if (authToken != null) {
-        context.go('/dashboard');
-      } else {
-        context.go('/auth');
-      }
+      return;
+    }
+
+    // Wait for the stored Firebase session to resolve, then let the auth guard
+    // decide between the dashboard and account setup.
+    final session = ref.read(sessionProvider);
+    await session.ready.timeout(const Duration(seconds: 8), onTimeout: () {});
+    if (!mounted) return;
+
+    switch (session.status) {
+      case SessionStatus.signedIn:
+        context.go(session.profileComplete ? '/dashboard' : '/profile-setup');
+        break;
+      case SessionStatus.loading:
+      case SessionStatus.signedOut:
+      case SessionStatus.unregistered:
+      // The backend was unreachable, so the account could not be resolved.
+      // Send the user to the entry point rather than stranding them on splash.
+      case SessionStatus.unavailable:
+        context.go(session.status == SessionStatus.unavailable
+            ? '/account-error'
+            : '/auth');
+        break;
     }
   }
 
@@ -83,7 +104,11 @@ class _SplashScreenState extends State<SplashScreen>
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [AppColors.background, AppColors.surfaceLight, AppColors.background],
+            colors: [
+              AppColors.background,
+              AppColors.surfaceLight,
+              AppColors.background
+            ],
           ),
         ),
         child: Stack(
@@ -151,10 +176,16 @@ class _SplashScreenState extends State<SplashScreen>
                             ),
                           ],
                         ),
-                        child: const Icon(
-                          Icons.handshake_rounded,
-                          size: 56,
-                          color: Colors.white,
+                        clipBehavior: Clip.antiAlias,
+                        child: Image.asset(
+                          'assets/images/logo.png',
+                          fit: BoxFit.contain,
+                          errorBuilder: (context, error, stackTrace) =>
+                              const Icon(
+                            Icons.handshake_rounded,
+                            size: 56,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                     ),

@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../shared/models/models.dart';
+import 'account_service.dart';
+import 'session_controller.dart';
 
 // Selected language provider
 final selectedLanguageProvider = StateProvider<String>((ref) => 'hi');
@@ -10,11 +12,14 @@ Future<String> loadSelectedLanguage() async {
   return prefs.getString('selected_language') == 'en' ? 'en' : 'hi';
 }
 
-// Auth state provider
-final authStateProvider =
-    StateProvider<AuthState>((ref) => AuthState.unauthenticated);
+final accountServiceProvider = Provider<AccountService>((ref) => AccountService());
 
-enum AuthState { unauthenticated, authenticating, authenticated }
+/// Authentication session — the source of truth for role-locked access.
+final sessionProvider = ChangeNotifierProvider<SessionController>((ref) {
+  final controller = SessionController(accounts: ref.watch(accountServiceProvider));
+  ref.onDispose(controller.dispose);
+  return controller;
+});
 
 // User profile provider
 final artisanProfileProvider = StateProvider<ArtisanProfile?>((ref) => null);

@@ -1,23 +1,31 @@
-import '../../core/localization/app_strings.dart';
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pinput/pinput.dart';
-import '../../core/theme/app_colors.dart';
-import '../../core/services/phone_auth_service.dart';
 
-class OtpScreen extends StatefulWidget {
+import '../../core/localization/app_strings.dart';
+import '../../core/services/app_providers.dart';
+import '../../core/services/auth_service.dart';
+import '../../core/theme/app_colors.dart';
+
+String _b(BuildContext context, String en, String hi) =>
+    context.isHindi ? hi : en;
+
+class OtpScreen extends ConsumerStatefulWidget {
   final String phoneNumber;
   const OtpScreen({super.key, required this.phoneNumber});
 
   @override
-  State<OtpScreen> createState() => _OtpScreenState();
+  ConsumerState<OtpScreen> createState() => _OtpScreenState();
 }
 
-class _OtpScreenState extends State<OtpScreen> {
+class _OtpScreenState extends ConsumerState<OtpScreen> {
   final _otpController = TextEditingController();
   bool _loading = false;
   int _resendSeconds = 30;
-  bool _canResend = false;
+  Timer? _timer;
 
   @override
   void initState() {
@@ -26,14 +34,12 @@ class _OtpScreenState extends State<OtpScreen> {
   }
 
   void _startResendTimer() {
-    Future.doWhile(() async {
-      await Future.delayed(const Duration(seconds: 1));
-      if (!mounted) return false;
-      setState(() {
-        _resendSeconds--;
-        if (_resendSeconds <= 0) _canResend = true;
-      });
-      return _resendSeconds > 0;
+    _timer?.cancel();
+    _resendSeconds = 30;
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) return;
+      setState(() => _resendSeconds--);
+      if (_resendSeconds <= 0) timer.cancel();
     });
   }
 
@@ -41,15 +47,44 @@ class _OtpScreenState extends State<OtpScreen> {
     if (otp.length < 6 || _loading) return;
     setState(() => _loading = true);
     try {
-      await PhoneAuthService.verify(otp);
-      if (mounted) context.go('/dashboard');
+      await AuthService.verifyOtp(otp);
+      // Resolve the account before deciding whether role selection is needed.
+      await ref.read(sessionProvider).resolveIdentity();
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
-    } finally { if (mounted) setState(() => _loading = false); }
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('$e')));
+        _otpController.clear();
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _resend() async {
+    try {
+      if (_loading || _resendSeconds > 0) return;
+      setState(() => _loading = true);
+      final automatic = await AuthService.sendOtp(widget.phoneNumber);
+      if (automatic) await ref.read(sessionProvider).resolveIdentity();
+      if (!mounted) return;
+      _startResendTimer();
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(_b(context, 'OTP resent', 'OTP दोबारा भेजा गया')),
+      ));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('$e')));
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   @override
   void dispose() {
+    _timer?.cancel();
     _otpController.dispose();
     super.dispose();
   }
@@ -68,28 +103,32 @@ class _OtpScreenState extends State<OtpScreen> {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.glassBorder, width: 1.5),
+        border: Border.all(color: AppColors.divider, width: 1.5),
       ),
     );
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_rounded),
-          onPressed: () => context.pop(),
+          icon: const Icon(Icons.arrow_back_ios_rounded,
+              color: AppColors.textPrimary),
+          onPressed: () =>
+              context.canPop() ? context.pop() : context.go('/auth'),
         ),
       ),
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 20),
-              const AppText(
-                'OTP दर्ज करें',
-                style: TextStyle(
+              Text(
+                _b(context, 'Enter OTP', 'OTP दर्ज करें'),
+                style: const TextStyle(
                   fontFamily: 'Poppins',
                   fontSize: 28,
                   fontWeight: FontWeight.w700,
@@ -105,7 +144,8 @@ class _OtpScreenState extends State<OtpScreen> {
                     color: AppColors.textSecondary,
                   ),
                   children: [
-                    TextSpan(text: context.tr('OTP sent to ')),
+                    TextSpan(
+                        text: _b(context, 'OTP sent to ', 'OTP भेजा गया: ')),
                     TextSpan(
                       text: widget.phoneNumber,
                       style: const TextStyle(
@@ -117,21 +157,15 @@ class _OtpScreenState extends State<OtpScreen> {
                 ),
               ),
               const SizedBox(height: 48),
-              // OTP boxes
               Center(
                 child: Pinput(
                   controller: _otpController,
+                  enabled: !_loading,
                   length: 6,
                   defaultPinTheme: defaultPinTheme,
                   focusedPinTheme: defaultPinTheme.copyWith(
                     decoration: defaultPinTheme.decoration!.copyWith(
                       border: Border.all(color: AppColors.primary, width: 2),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.primary.withOpacity(0.2),
-                          blurRadius: 8,
-                        ),
-                      ],
                     ),
                   ),
                   submittedPinTheme: defaultPinTheme.copyWith(
@@ -144,23 +178,13 @@ class _OtpScreenState extends State<OtpScreen> {
                 ),
               ),
               const SizedBox(height: 40),
-              // Verify button
               GestureDetector(
                 onTap: _loading ? null : () => _verifyOtp(_otpController.text),
                 child: Container(
                   height: 56,
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [AppColors.primary, AppColors.secondary],
-                    ),
+                    gradient: AppColors.primaryGradient,
                     borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primary.withOpacity(0.35),
-                        blurRadius: 20,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
                   ),
                   child: Center(
                     child: _loading
@@ -168,13 +192,12 @@ class _OtpScreenState extends State<OtpScreen> {
                             width: 22,
                             height: 22,
                             child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2.5,
-                            ),
+                                color: Colors.white, strokeWidth: 2.5),
                           )
-                        : const AppText(
-                            'Verify & Continue',
-                            style: TextStyle(
+                        : Text(
+                            _b(context, 'Verify & Continue',
+                                'सत्यापित करें और आगे बढ़ें'),
+                            style: const TextStyle(
                               fontFamily: 'Poppins',
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
@@ -186,54 +209,23 @@ class _OtpScreenState extends State<OtpScreen> {
               ),
               const SizedBox(height: 24),
               Center(
-                child: _canResend
+                child: _resendSeconds <= 0
                     ? TextButton(
-                          onPressed: () async {
-                            try { await PhoneAuthService.send(widget.phoneNumber); }
-                            catch (e) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e'))); return; }
-                            if (!mounted) return;
-                          setState(() {
-                            _canResend = false;
-                            _resendSeconds = 30;
-                          });
-                          _startResendTimer();
-                        },
-                        child: const AppText(
-                          'Resend OTP',
-                          style: TextStyle(color: AppColors.primary),
+                        onPressed: _resend,
+                        child: Text(
+                          _b(context, 'Resend OTP', 'OTP दोबारा भेजें'),
+                          style: const TextStyle(color: AppColors.primary),
                         ),
                       )
-                    : AppText(
-                        context.isHindi
-                            ? '$_resendSeconds सेकंड में OTP दोबारा भेजें'
-                            : 'Resend OTP in $_resendSeconds s',
+                    : Text(
+                        _b(context, 'Resend OTP in $_resendSeconds s',
+                            '$_resendSeconds सेकंड में OTP दोबारा भेजें'),
                         style: const TextStyle(
                           fontFamily: 'Poppins',
                           color: AppColors.textHint,
                           fontSize: 13,
                         ),
                       ),
-              ),
-              const SizedBox(height: 16),
-              // Demo hint
-              Center(
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppColors.glassBorder),
-                  ),
-                  child: const AppText(
-                    '💡 Demo: Enter any 6 digits',
-                    style: TextStyle(
-                      fontFamily: 'Poppins',
-                      fontSize: 12,
-                      color: AppColors.textHint,
-                    ),
-                  ),
-                ),
               ),
             ],
           ),

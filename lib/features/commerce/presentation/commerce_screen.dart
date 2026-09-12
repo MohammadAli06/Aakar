@@ -1,10 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/localization/app_strings.dart';
+import '../../../core/services/app_providers.dart';
+import '../../../shared/models/account.dart';
 import '../data/commerce_repository.dart';
 import '../domain/commerce_engine.dart';
 import 'craft_forms.dart';
 import 'craft_widgets.dart';
+
+/// Turns an enum-style value such as `pottery` into `Pottery`, which is the key
+/// the translation table expects.
+String _label(String value) =>
+    value.isEmpty ? value : value[0].toUpperCase() + value.substring(1);
 
 class CommerceScreen extends ConsumerStatefulWidget {
   final String page;
@@ -23,6 +31,15 @@ class _CommerceScreenState extends ConsumerState<CommerceScreen> {
   String t(String en, String hi) => bilingual(context, en, hi);
   void go(String page, [String? id]) =>
       context.push('/workspace/$page${id == null ? '' : '/$id'}');
+
+  String _timeGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour >= 5 && hour < 12) return t('GOOD MORNING,', 'सुप्रभात,');
+    if (hour >= 12 && hour < 17) return t('GOOD AFTERNOON,', 'नमस्ते,');
+    if (hour >= 17 && hour < 21) return t('GOOD EVENING,', 'शुभ संध्या,');
+    return t('GOOD NIGHT,', 'शुभ रात्रि,');
+  }
+
   @override
   void dispose() {
     search.dispose();
@@ -75,7 +92,14 @@ class _CommerceScreenState extends ConsumerState<CommerceScreen> {
   @override
   Widget build(BuildContext context) {
     final store = ref.watch(commerceProvider);
-    final buyer = store.role == 'buyer';
+    // Role comes from the signed-in account and is fixed at signup; the workspace
+    // follows it rather than offering a switch.
+    final accountRole = ref.watch(sessionProvider).role?.name;
+    if (accountRole != null && accountRole != store.role) {
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => store.applyAccountRole(accountRole));
+    }
+    final buyer = (accountRole ?? store.role) == 'buyer';
     final rootPages = [
       'home',
       'discover',
@@ -103,7 +127,7 @@ class _CommerceScreenState extends ConsumerState<CommerceScreen> {
                 child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                  const Text('CraftConnect',
+                  const Text('Aakar',
                       style: TextStyle(
                           fontSize: 19,
                           fontWeight: FontWeight.w700,
@@ -120,6 +144,30 @@ class _CommerceScreenState extends ConsumerState<CommerceScreen> {
                 tooltip: t('Choose your language', 'अपनी भाषा चुनें'),
                 onPressed: () => context.push('/language'),
                 icon: const Icon(Icons.language, size: 21)),
+            IconButton(
+                tooltip: t('Sign out', 'साइन आउट'),
+                onPressed: () async {
+                  final confirmed = await showDialog<bool>(
+                      context: context,
+                      builder: (dialog) => AlertDialog(
+                            title: Text(t('Sign out?', 'साइन आउट करें?')),
+                            content: Text(t(
+                                'You will need to sign in again to continue.',
+                                'जारी रखने के लिए दोबारा साइन इन करना होगा।')),
+                            actions: [
+                              TextButton(
+                                  onPressed: () => Navigator.pop(dialog, false),
+                                  child: Text(t('Cancel', 'रद्द करें'))),
+                              TextButton(
+                                  onPressed: () => Navigator.pop(dialog, true),
+                                  child: Text(t('Sign out', 'साइन आउट'))),
+                            ],
+                          ));
+                  if (confirmed == true) {
+                    await ref.read(sessionProvider).signOut();
+                  }
+                },
+                icon: const Icon(Icons.logout_rounded, size: 21)),
             const SizedBox(width: 5)
           ]),
       body: SafeArea(
@@ -129,36 +177,32 @@ class _CommerceScreenState extends ConsumerState<CommerceScreen> {
                   Padding(
                       padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
                       child: Row(children: [
-                        Expanded(
-                            child: SegmentedButton<String>(
-                                style: SegmentedButton.styleFrom(
-                                    visualDensity: VisualDensity.compact,
-                                    textStyle: const TextStyle(
-                                        fontSize: 11, fontFamily: 'Poppins')),
-                                segments: [
-                                  ButtonSegment(
-                                      value: 'artisan',
-                                      icon: const Icon(Icons.handyman_outlined,
-                                          size: 15),
-                                      label: Text(
-                                          t('Artisan Mode', 'कारीगर मोड'))),
-                                  ButtonSegment(
-                                      value: 'buyer',
-                                      icon: const Icon(
-                                          Icons.storefront_outlined,
-                                          size: 15),
-                                      label:
-                                          Text(t('Buyer Mode', 'खरीदार मोड')))
-                                ],
-                                selected: {store.role},
-                                onSelectionChanged: store.busy
-                                    ? null
-                                    : (v) async {
-                                        await store.switchRole(v.first);
-                                        if (mounted) context.go('/dashboard');
-                                      })),
-                        const SizedBox(width: 8),
-                        const StatusPill('DEMO')
+                        Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 7),
+                            decoration: BoxDecoration(
+                                color: const Color(0xFFE6F1E8),
+                                borderRadius: BorderRadius.circular(20)),
+                            child:
+                                Row(mainAxisSize: MainAxisSize.min, children: [
+                              Icon(
+                                  buyer
+                                      ? Icons.storefront_outlined
+                                      : Icons.handyman_outlined,
+                                  size: 15,
+                                  color: const Color(0xFF286047)),
+                              const SizedBox(width: 7),
+                              Text(
+                                  buyer
+                                      ? t('Buyer account', 'खरीदार खाता')
+                                      : t('Artisan account', 'कारीगर खाता'),
+                                  style: const TextStyle(
+                                      fontSize: 11,
+                                      fontFamily: 'Poppins',
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF286047))),
+                            ])),
+                        const Spacer(),
                       ])),
                   if (store.busy) const LinearProgressIndicator(minHeight: 2),
                   if (store.error != null)
@@ -331,13 +375,15 @@ class _CommerceScreenState extends ConsumerState<CommerceScreen> {
                     child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(t('GOOD MORNING,', 'नमस्ते,'),
+                          Text(_timeGreeting(),
                               style: const TextStyle(
                                   fontSize: 10,
                                   letterSpacing: 1.6,
                                   color: Color(0xFF6E796A))),
                           const SizedBox(height: 7),
-                          Text('${repo.profile['name']}',
+                          Text(
+                              ref.watch(sessionProvider).account?.displayName ??
+                                  '—',
                               style: const TextStyle(
                                   fontSize: 22,
                                   height: 1.2,
@@ -352,10 +398,25 @@ class _CommerceScreenState extends ConsumerState<CommerceScreen> {
                               style: const TextStyle(fontSize: 11, height: 1.6))
                         ])),
                 const SizedBox(width: 8),
-                const Expanded(flex: 2, child: CraftImage('pottery', size: 120))
+                Expanded(
+                    flex: 2,
+                    child: Container(
+                        width: 120,
+                        height: 120,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE8DFD0),
+                          borderRadius: BorderRadius.circular(60),
+                        ),
+                        child: Icon(
+                          buyer
+                              ? Icons.storefront_outlined
+                              : Icons.handshake_outlined,
+                          size: 54,
+                          color: const Color(0xFF5A7A5C),
+                        )))
               ]))),
       if (buyer) ...[
-        if (repo.profile['verification'] != 'verified')
+        if (!(ref.watch(sessionProvider).account?.isVerified ?? false))
           CraftButton(
               t('Complete business verification', 'व्यवसाय सत्यापन पूरा करें'),
               secondary: true,
@@ -1440,7 +1501,7 @@ class _CommerceScreenState extends ConsumerState<CommerceScreen> {
       title(
           'Payment commitments',
           'भुगतान के वादे',
-          t('Demo records only. CraftConnect does not hold or transfer money.',
+          t('Demo records only. Aakar does not hold or transfer money.',
               'केवल डेमो रिकॉर्ड। ऐप पैसे नहीं रखता या भेजता।')),
       CraftCard(
           child: Column(
@@ -1880,174 +1941,92 @@ class _CommerceScreenState extends ConsumerState<CommerceScreen> {
                     : () => context.push('/workspace/${n['link']}'))))
       ];
   List<Widget> profile() {
-    final p = repo.profile;
+    final session = ref.watch(sessionProvider);
+    final account = session.account;
+    final isArtisan =
+        (account?.role ?? AccountRole.artisan) == AccountRole.artisan;
+    final name = account == null ? '—' : account.displayName;
+    final location = [
+      if (account?.state != null && account!.state!.isNotEmpty) account.state,
+      if (account?.district != null && account!.district!.isNotEmpty)
+        account.district,
+    ].join(', ');
+    final contact = account?.phone ?? account?.email ?? '—';
+    final verified = account?.isVerified ?? false;
+    final initial = name.trim().isEmpty ? '?' : name.trim().substring(0, 1);
+
     return [
-      title(
-          repo.role == 'buyer'
-              ? 'Your business profile'
-              : 'Your artisan profile',
-          repo.role == 'buyer'
-              ? 'आपकी व्यवसाय प्रोफ़ाइल'
-              : 'आपकी कारीगर प्रोफ़ाइल'),
+      title(isArtisan ? 'Your artisan profile' : 'Your business profile',
+          isArtisan ? 'आपकी कारीगर प्रोफ़ाइल' : 'आपकी व्यवसाय प्रोफ़ाइल'),
       CraftCard(
           child: Column(children: [
         CircleAvatar(
             radius: 32,
             backgroundColor: const Color(0xFFE3E9DA),
-            child: Text('${p['name']}'.substring(0, 1),
+            child: Text(initial,
                 style:
                     const TextStyle(fontSize: 28, color: Color(0xFF285448)))),
         const SizedBox(height: 12),
-        Text('${p['name']}',
+        Text(name,
+            textAlign: TextAlign.center,
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
         const SizedBox(height: 8),
-        StatusPill('${p['verification']}',
-            warning: p['verification'] != 'verified'),
-        DetailRow(t('Location', 'स्थान'), '${p['location']}'),
-        DetailRow(t('Contact', 'संपर्क'), '${p['email'] ?? p['phone'] ?? '—'}'),
-        if (p['verification_note'] != null)
-          Text('${p['verification_note']}',
-              style: const TextStyle(fontSize: 12)),
-        CraftButton(t('Edit business details', 'प्रोफ़ाइल बदलें'),
-            onPressed: () => editProfile(false)),
-        CraftButton(t('Submit for verification', 'सत्यापन के लिए भेजें'),
-            secondary: true, onPressed: () => editProfile(true)),
-        Text(
-            t('Pending businesses can explore. Verification is manually reviewed; no guaranteed turnaround.',
-                'सत्यापन के दौरान भी खोज सकते हैं। एडमिन समीक्षा करेगा।'),
-            style: const TextStyle(fontSize: 11))
+        StatusPill(verified ? 'verified' : 'pending', warning: !verified),
+        const SizedBox(height: 8),
+        if (isArtisan)
+          DetailRow(
+              t('Craft', 'शिल्प'),
+              account?.craftCategory == null
+                  ? '—'
+                  : context.tr(_label(account!.craftCategory!))),
+        if (!isArtisan)
+          DetailRow(t('Business', 'व्यवसाय'),
+              account?.businessName ?? account?.industry ?? '—'),
+        DetailRow(t('Location', 'स्थान'), location.isEmpty ? '—' : location),
+        DetailRow(t('Contact', 'संपर्क'), contact),
       ])),
-      if (repo.role == 'artisan')
-        CraftCard(
-            child: DropdownButtonFormField<String>(
-                initialValue: repo.artisanId,
-                isExpanded: true,
-                decoration: InputDecoration(
-                    labelText: t('Demo artisan identity', 'डेमो कारीगर पहचान')),
-                items: repo
-                    .table('profiles')
-                    .where((p) => p['role'] == 'artisan')
-                    .map((p) => DropdownMenuItem(
-                        value: '${p['id']}',
-                        child: Text('${p['name']}',
-                            style: const TextStyle(fontSize: 12))))
-                    .toList(),
-                onChanged: (v) {
-                  if (v != null) repo.switchArtisan(v);
-                })),
+      CraftButton(t('Edit profile', 'प्रोफ़ाइल बदलें'),
+          onPressed: () => context.push('/profile/edit')),
+      CraftButton(t('View verification', 'सत्यापन देखें'),
+          secondary: true, onPressed: () => context.push('/verification')),
       CraftCard(
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(t('Workspace connection', 'वर्कस्पेस कनेक्शन'),
+        Text(t('Verification', 'सत्यापन'),
             style: const TextStyle(fontWeight: FontWeight.w600)),
         const SizedBox(height: 8),
-        StatusPill(repo.modeLabel),
+        StatusPill(verified ? 'verified' : 'pending', warning: !verified),
         const SizedBox(height: 10),
         Text(
-            t('On-device demo is saved on this phone. Connect a shared demo workspace to use the separate admin dashboard and sync devices. Connecting opens the server’s workspace; it does not upload local records.',
-                'फ़ोन डेमो यहीं सहेजता है। अलग एडमिन और डिवाइस सिंक के लिए साझा डेमो जोड़ें। जोड़ने पर सर्वर के रिकॉर्ड खुलेंगे।'),
-            style: const TextStyle(fontSize: 11, height: 1.6)),
-        CraftButton(t('Connect backend workspace', 'बैकएंड वर्कस्पेस जोड़ें'),
-            secondary: true, onPressed: () async {
-          final d = await craftForm(
-              context, t('Shared demo connection', 'साझा डेमो कनेक्शन'), const [
-            CraftField('url', 'Backend base URL', 'बैकएंड URL', required: true),
-            CraftField('key', 'Demo access token', 'डेमो एक्सेस टोकन',
-                required: true)
-          ],
-              initial: {
-                'url': repo.endpoint.isEmpty
-                    ? 'http://10.0.2.2:8000'
-                    : repo.endpoint
-              });
-          if (d != null) {
-            try {
-              await repo.connect('${d['url']}', '${d['key']}');
-              toast(t('Connected', 'जुड़ गया'));
-            } catch (_) {
-              toast(t('Connection failed. Check server URL and demo token.',
-                  'कनेक्शन नहीं हुआ। URL और टोकन जाँचें।'));
-            }
-          }
-        }),
-        CraftButton(
-            t('Reset to a fresh on-device demo', 'नया फ़ोन डेमो शुरू करें'),
-            secondary: true, onPressed: () async {
-          final yes = await showDialog<bool>(
-              context: context,
-              builder: (c) => AlertDialog(
-                      title:
-                          Text(t('Reset local demo?', 'फ़ोन डेमो रीसेट करें?')),
-                      content: Text(t(
-                          'This replaces the demo records saved on this phone. Shared server records are not deleted.',
-                          'फ़ोन के डेमो रिकॉर्ड बदलेंगे। सर्वर रिकॉर्ड नहीं हटेंगे।')),
-                      actions: [
-                        TextButton(
-                            onPressed: () => Navigator.pop(c, false),
-                            child: Text(t('Cancel', 'रद्द'))),
-                        TextButton(
-                            onPressed: () => Navigator.pop(c, true),
-                            child: Text(t('Reset', 'रीसेट')))
-                      ]));
-          if (yes == true) await repo.localDemo();
-        })
+            verified
+                ? t('Your account is verified. Buyers can see your verified badge.',
+                    'आपका खाता सत्यापित है। खरीदार सत्यापित बैज देख सकते हैं।')
+                : t('Verification is reviewed manually by an administrator. You can keep using your account while it is pending.',
+                    'सत्यापन एडमिन मैन्युअल रूप से देखेगा। समीक्षा के दौरान भी खाता चलेगा।'),
+            style: const TextStyle(fontSize: 11, height: 1.6))
       ])),
+      CraftButton(t('Sign out', 'साइन आउट'), secondary: true,
+          onPressed: () async {
+        final yes = await showDialog<bool>(
+            context: context,
+            builder: (c) => AlertDialog(
+                    title: Text(t('Sign out?', 'साइन आउट करें?')),
+                    content: Text(t(
+                        'You will need to sign in again to continue.',
+                        'जारी रखने के लिए दोबारा साइन इन करना होगा।')),
+                    actions: [
+                      TextButton(
+                          onPressed: () => Navigator.pop(c, false),
+                          child: Text(t('Cancel', 'रद्द करें'))),
+                      TextButton(
+                          onPressed: () => Navigator.pop(c, true),
+                          child: Text(t('Sign out', 'साइन आउट')))
+                    ]));
+        if (yes == true) await ref.read(sessionProvider).signOut();
+      }),
       CraftButton(t('Help & scope', 'मदद और जानकारी'),
           secondary: true, onPressed: () => go('help')),
     ];
-  }
-
-  Future<void> editProfile(bool submit) async {
-    final d = await craftForm(
-        context,
-        submit
-            ? t('Verify your business', 'व्यवसाय सत्यापन')
-            : t('Business details', 'व्यवसाय विवरण'),
-        [
-          const CraftField(
-              'name', 'Business / artisan name', 'व्यवसाय / कारीगर नाम',
-              required: true),
-          const CraftField('email', 'Work email', 'कार्य ईमेल'),
-          const CraftField('phone', 'Phone number', 'फ़ोन नंबर'),
-          const CraftField('type', 'Business type', 'व्यवसाय प्रकार'),
-          const CraftField(
-              'industry', 'Industry / category', 'उद्योग / श्रेणी'),
-          const CraftField('location', 'Location', 'स्थान', required: true),
-          const CraftField(
-              'website', 'Website (optional)', 'वेबसाइट (वैकल्पिक)'),
-          if (repo.role == 'artisan') ...[
-            const CraftField('craft', 'Craft specialty', 'शिल्प विशेषज्ञता'),
-            const CraftField('experience', 'Experience (years)', 'अनुभव (वर्ष)',
-                numeric: true),
-            const CraftField('story', 'Craft story', 'शिल्प कहानी',
-                multiline: true)
-          ],
-          if (submit) ...[
-            const CraftField(
-                'document',
-                'Business / identity document reference',
-                'व्यवसाय / पहचान प्रमाण संदर्भ',
-                required: true),
-            const CraftField(
-                'contact_verified',
-                'I confirm these contact details are correct',
-                'संपर्क विवरण सही हैं',
-                toggle: true),
-            const CraftField(
-                'terms',
-                'I agree to submit these details for manual verification',
-                'मैं मैन्युअल सत्यापन के लिए सहमत हूँ',
-                toggle: true)
-          ]
-        ],
-        initial: repo.profile,
-        button: submit ? t('Submit for verification', 'सत्यापन भेजें') : null);
-    if (d != null)
-      await action('profile', {...d, 'submit': submit},
-          success: submit
-              ? t('Verification in progress. You can keep exploring.',
-                  'सत्यापन जारी है। आप खोज जारी रख सकते हैं।')
-              : t('Profile saved', 'प्रोफ़ाइल सहेजी गई'));
   }
 
   List<Widget> saved() => [
@@ -2181,6 +2160,10 @@ class _CommerceScreenState extends ConsumerState<CommerceScreen> {
   }
 
   List<Widget> help() => [
+        CraftCard(
+            child: Text(t(
+                'Demo workspace: sample products and orders, separate from your verified account.',
+                'डेमो कार्यक्षेत्र: नमूना उत्पाद और ऑर्डर आपके सत्यापित खाते से अलग हैं।'))),
         title('A little help, at every step', 'हर कदम पर थोड़ी मदद'),
         ...[
           [

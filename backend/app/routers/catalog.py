@@ -9,11 +9,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 
+from app.core.auth_deps import require_artisan_profile
 from app.core.database import get_db
+from app.core.ownership import load_owned_product
 from app.services.asr_service import transcribe_audio
 from app.services.extraction_service import extract_attributes_with_confidence
 from app.services.generation_service import generate_bilingual_listing
-from app.models.models import ProductListing, VerificationStatus
+from app.models.models import Artisan, Product, ProductListing, VerificationStatus
 
 router = APIRouter()
 
@@ -62,10 +64,15 @@ class VerifyListingRequest(BaseModel):
     corrected_listing: Optional[dict] = None
 
 
+async def _owned_product(db: AsyncSession, product_id: str, artisan: Artisan) -> Product:
+    return await load_owned_product(db, product_id, artisan)
+
+
 @router.post("/transcribe")
 async def transcribe(
     audio: UploadFile = File(...),
     language: str = Form(default="hi"),
+    artisan: Artisan = Depends(require_artisan_profile),
 ):
     """
     Upload audio → return transcript via Bhashini / IndicConformer.
@@ -82,6 +89,7 @@ async def transcribe(
 async def extract_attributes(
     transcript: str,
     craft_category: str = "other",
+    artisan: Artisan = Depends(require_artisan_profile),
 ):
     """
     Transcript → attribute extraction with per-field confidence scores.
@@ -94,12 +102,15 @@ async def extract_attributes(
 @router.post("/generate-listing", response_model=ListingResponse)
 async def generate_listing(
     data: ListingGenerateRequest,
+    artisan: Artisan = Depends(require_artisan_profile),
     db: AsyncSession = Depends(get_db),
 ):
     """
     Attributes → bilingual listing (EN + HI), craft-term preserving.
     Listing is initially ai_generated; artisan must approve before publish.
     """
+    product = await _owned_product(db, data.product_id, artisan)
+
     listing_data = await generate_bilingual_listing(
         data.attributes,
         data.artisan_name,
@@ -127,6 +138,7 @@ async def generate_listing(
 @router.post("/verify-listing")
 async def verify_listing(
     data: VerifyListingRequest,
+    artisan: Artisan = Depends(require_artisan_profile),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -134,8 +146,9 @@ async def verify_listing(
     Nothing publishes until this step is completed with 'accept'.
     Logs the artisan action to VerificationLog.
     """
-    from sqlalchemy import select
     from app.models.models import VerificationLog
+
+    await _owned_product(db, data.product_id, artisan)
 
     result = await db.execute(
         select(ProductListing).where(ProductListing.product_id == data.product_id)
@@ -157,12 +170,14 @@ async def verify_listing(
         listing.verification_status = VerificationStatus.artisan_reviewed
     elif data.artisan_action == "reject":
         listing.verification_status = VerificationStatus.rejected
+    else:
+        raise HTTPException(status_code=422, detail="artisan_action must be accept, edit or reject")
 
-    # Log the action
+    # Log the action against the authenticated artisan
     log = VerificationLog(
         entity_type="listing",
         entity_id=listing.id,
-        artisan_id="",  # populated from JWT in production
+        artisan_id=artisan.id,
         previous_status=prev_status,
         new_status=listing.verification_status,
         artisan_action=data.artisan_action,

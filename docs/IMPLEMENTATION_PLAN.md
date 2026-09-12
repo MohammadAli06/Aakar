@@ -1,5 +1,24 @@
 # Implementation plan and demo checklist
 
+## Production onboarding slice — 2026-09-12
+
+- [x] Restore main home and workspace navigation after login / verification (2026-09-13). Keep the commerce demo boundary in Profile → Help & scope, without a top banner, and retain real account details at `/account`; refreshing verification also refreshes the account badge. Tenant-scoped commerce remains pending.
+
+- [x] Follow the revised single-role rule: existing phone accounts skip role selection, opposite-role creation is rejected, and business profile setup offers back navigation.
+- [x] Keep existing-account login read-only; test emitted SQL for both roles and remove unused client role-switch methods. No automatic role reconciliation.
+
+- [x] Shared Firebase phone sign-in screen and backend account lookup; handle unavailable backend separately from new accounts.
+- [x] Backend profile persistence and initial artisan/buyer role selection for new phone accounts only.
+- [x] Warm artisan / cool buyer themes for profile, verification and account home, with Hindi/English support.
+- [x] Private image uploads, consent/evidence checks, pending review and admin-only review APIs; profile changes require re-review.
+- [x] Remove demo entry/reset controls from onboarding; keep legacy API screens blocked. Main commerce workspace access restored with explicit demo labeling on 2026-09-13.
+- [x] Add the production account-review web UI (`admin-web/`): dashboard, verification queue and review, accounts, product moderation, manual order issues, counts, audit trail.
+- [ ] Validate actual device OTP, resend/autoverification, camera permissions and PostgreSQL setup.
+- [ ] Add deployment migrations and tenant-scoped commerce screens/services.
+- [ ] Implement pgvector semantic matching; existing embedding placeholders are not completion evidence.
+
+See [Account onboarding](ACCOUNT_ONBOARDING.md). The historical demo checklist below remains a record of that implementation, not a production-readiness claim.
+
 Target: [Updated architecture](UPDATED_ARCHITECTURE.md). Baseline: [Project context](PROJECT_CONTEXT.md). Implementation added 2026-09-11. Read [implemented coverage and remaining boundaries](IMPLEMENTED_WORKFLOWS.md). Checked items have automated implementation evidence; open items include device/live-integration acceptance or partially implemented behavior. No live provider integration is implied.
 
 ## 1. Preserve the existing flow and establish shared state
@@ -14,7 +33,9 @@ Accept when the same phone can switch roles without losing language/session/busi
 
 ## 2. Finish product creation and separate publication
 
-- [ ] Wire guided capture/enhancement with original preservation and review; label any simulated processing.
+- [x] Remove the four trailing Review Catalog toggles (availability, customization, fragility, safe packaging) at user request. Preserve stored values and existing readiness checks; removing controls does not confirm capabilities.
+
+- [x] Wire guided capture/enhancement with original preservation and review; label any simulated processing. The studio now offers three real, deterministic preparations — plain background, exposure correction and a fixed 1200×1200 catalogue frame — each with before/after comparison, undo, and the choice stored on the product record. Back navigation moves between studio steps instead of leaving the wizard.
 - [ ] Wire speech input, image/voice extraction, confidence-based follow-ups, generated catalog, read-aloud, and voice corrections/approval.
 - [x] Ensure artisan-set final price is saved; fix and test recommendation cost-floor enforcement, including cost above demo market prices.
 - [x] End creation at My Products. Support Draft, Ready to publish, Published, Needs update; map existing enums deliberately.
@@ -74,6 +95,7 @@ Accept when the demo explains who packs, where goods go, who carries them, who p
 - [x] Implement artisan/buyer verification queue with approve/reject/request correction.
 - [x] Add basic flagged-product/AI-output moderation and basic counts.
 - [x] Add a minimal manual order-issue queue exposing agreed terms, payment/production/fulfillment status, and evidence; record admin review notes/outcome and support optional production review.
+- [x] Rebuild the admin console as a React app over the real account APIs (`admin-web/`): account directory, verification review with private evidence, product moderation state, counts, and an administrator audit trail. Order issues and progress reviews remain workspace-backed and are labelled as the shared demo workspace.
 - [ ] Confirm both mobile modes and admin see consistent statuses with appropriate access.
 - [ ] Repair backend setup gaps relevant to the chosen demo (migrations, channel seeding, worker references if needed).
 - [x] Update README/current context to match working commands and honestly distinguish real services from fixtures.

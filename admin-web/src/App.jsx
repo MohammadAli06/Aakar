@@ -1,63 +1,198 @@
-import React from 'react'
-import './App.css'
+import { useCallback, useEffect, useState } from 'react'
+import { api, clearToken, getToken } from './lib/api.js'
+import { navigate, useRoute } from './lib/router.jsx'
+import { ToastProvider } from './components/ToastProvider.jsx'
+import { Layout } from './components/Layout.jsx'
+import { Button, Card, Empty } from './components/Ui.jsx'
+import { Login } from './pages/Login.jsx'
+import { Dashboard } from './pages/Dashboard.jsx'
+import { Verification } from './pages/Verification.jsx'
+import { VerificationDetail } from './pages/VerificationDetail.jsx'
+import { Accounts } from './pages/Accounts.jsx'
+import { AccountDetail } from './pages/AccountDetail.jsx'
+import { Products } from './pages/Products.jsx'
+import { ProductDetail } from './pages/ProductDetail.jsx'
+import { Issues } from './pages/Issues.jsx'
+import { Analytics } from './pages/Analytics.jsx'
+import { Activity } from './pages/Activity.jsx'
+import { Platform } from './pages/Platform.jsx'
+import { Deferred } from './pages/Deferred.jsx'
 
-function App() {
+const SECTIONS = new Set([
+  'dashboard',
+  'verification',
+  'accounts',
+  'products',
+  'issues',
+  'analytics',
+  'activity',
+  'platform',
+  'deferred',
+])
+
+function NotFound() {
   return (
-    <div style={{
-      fontFamily: 'system-ui, sans-serif',
-      minHeight: '100vh',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: '#f8f7f2',
-      color: '#233c32',
-      padding: '24px',
-      textAlign: 'center'
-    }}>
-      <header style={{ marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '32px', margin: '0 0 8px 0', fontFamily: 'Georgia, serif' }}>
-          ✦ Aakar Admin Dashboard
-        </h1>
-        <p style={{ color: '#7c8275', margin: 0, fontSize: '15px' }}>
-          Real craft. Responsible connections.
-        </p>
-      </header>
-
-      <div style={{
-        background: '#ffffff',
-        border: '1px solid #e3e6dc',
-        borderRadius: '16px',
-        padding: '32px',
-        maxWidth: '480px',
-        width: '100%',
-        boxShadow: '0 4px 12px rgba(0,0,0,0.03)'
-      }}>
-        <span style={{
-          display: 'inline-block',
-          fontSize: '12px',
-          fontWeight: 600,
-          padding: '4px 12px',
-          borderRadius: '12px',
-          background: '#e8f0e5',
-          color: '#356147',
-          marginBottom: '16px'
-        }}>
-          ADMIN PORTAL · UNDER SETUP
-        </span>
-        <h2 style={{ fontSize: '20px', margin: '0 0 12px 0' }}>Verification & Moderation Workspace</h2>
-        <p style={{ color: '#59624f', fontSize: '14px', lineHeight: 1.6, margin: '0 0 20px 0' }}>
-          This React portal will connect to the FastAPI backend at <code>/api/v1/workspace</code> for artisan verification, product moderation, and order issue reviews.
-        </p>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px', textAlign: 'left', background: '#f6f6ef', padding: '14px', borderRadius: '8px' }}>
-          <div><strong>Backend API:</strong> <code>http://localhost:8000/api/v1</code></div>
-          <div><strong>Role:</strong> Administrator</div>
-          <div><strong>Status:</strong> Ready for development</div>
-        </div>
-      </div>
-    </div>
+    <Card>
+      <Empty
+        icon="search"
+        title="Page not found"
+        text="That route does not exist in the admin console."
+        action={
+          <Button variant="ghost" size="sm" onClick={() => navigate('/dashboard')}>
+            Go to dashboard
+          </Button>
+        }
+      />
+    </Card>
   )
 }
 
-export default App
+function Console({ section, id, reloadKey, counts, onRefresh, onSignOut, refreshing }) {
+  let page
+  switch (section) {
+    case 'verification':
+      page = id ? <VerificationDetail recordId={id} reloadKey={reloadKey} /> : <Verification reloadKey={reloadKey} />
+      break
+    case 'accounts':
+      page = id ? <AccountDetail userId={id} reloadKey={reloadKey} /> : <Accounts reloadKey={reloadKey} />
+      break
+    case 'products':
+      page = id ? <ProductDetail productId={id} reloadKey={reloadKey} /> : <Products reloadKey={reloadKey} />
+      break
+    case 'issues':
+      page = <Issues reloadKey={reloadKey} />
+      break
+    case 'analytics':
+      page = <Analytics reloadKey={reloadKey} />
+      break
+    case 'activity':
+      page = <Activity reloadKey={reloadKey} />
+      break
+    case 'platform':
+      page = <Platform reloadKey={reloadKey} />
+      break
+    case 'deferred':
+      page = <Deferred section={id} />
+      break
+    case 'dashboard':
+      page = <Dashboard reloadKey={reloadKey} />
+      break
+    default:
+      page = <NotFound />
+  }
 
+  return (
+    <Layout
+      section={SECTIONS.has(section) ? section : 'dashboard'}
+      counts={counts}
+      onRefresh={onRefresh}
+      refreshing={refreshing}
+      onSignOut={onSignOut}
+    >
+      {page}
+    </Layout>
+  )
+}
+
+export default function App() {
+  const { section, id } = useRoute()
+  const [session, setSession] = useState(() => (getToken() ? 'checking' : 'signed-out'))
+  const [counts, setCounts] = useState(null)
+  const [reloadKey, setReloadKey] = useState(0)
+  const [refreshing, setRefreshing] = useState(false)
+
+  // Validate a stored token once on load. Only an explicit rejection signs out;
+  // a network failure leaves the console usable with visible errors.
+  useEffect(() => {
+    if (session !== 'checking') return
+    api('/admin/overview').then(
+      () => setSession('signed-in'),
+      (error) => {
+        if (error.status === 403) {
+          clearToken()
+          setSession('signed-out')
+        } else {
+          setSession('signed-in')
+        }
+      },
+    )
+  }, [session])
+
+  // A rejected token on any later request signs the console out.
+  useEffect(() => {
+    const onUnauthorized = () => {
+      clearToken()
+      setSession('signed-out')
+    }
+    window.addEventListener('aakar:unauthorized', onUnauthorized)
+    return () => window.removeEventListener('aakar:unauthorized', onUnauthorized)
+  }, [])
+
+  // Sidebar badges read the same overview endpoint the dashboard uses.
+  useEffect(() => {
+    if (session !== 'signed-in') return undefined
+    let alive = true
+    api('/admin/overview').then(
+      (data) => {
+        if (alive) setCounts(data)
+      },
+      () => {
+        if (alive) setCounts(null)
+      },
+    )
+    return () => {
+      alive = false
+    }
+  }, [session, reloadKey])
+
+  const refresh = useCallback(() => {
+    setRefreshing(true)
+    setReloadKey((value) => value + 1)
+    window.setTimeout(() => setRefreshing(false), 700)
+  }, [])
+
+  const signIn = useCallback(() => {
+    setSession('signed-in')
+    navigate('/dashboard')
+  }, [])
+
+  const signOut = useCallback(() => {
+    clearToken()
+    setCounts(null)
+    setSession('signed-out')
+    navigate('/dashboard')
+  }, [])
+
+  if (session === 'checking') {
+    return (
+      <div className="splash">
+        <div className="loading">
+          <span className="spinner" />
+          Verifying administrator access…
+        </div>
+      </div>
+    )
+  }
+
+  if (session === 'signed-out') {
+    return (
+      <ToastProvider>
+        <Login onSignedIn={signIn} />
+      </ToastProvider>
+    )
+  }
+
+  return (
+    <ToastProvider>
+      <Console
+        section={section}
+        id={id}
+        reloadKey={reloadKey}
+        counts={counts}
+        onRefresh={refresh}
+        onSignOut={signOut}
+        refreshing={refreshing}
+      />
+    </ToastProvider>
+  )
+}

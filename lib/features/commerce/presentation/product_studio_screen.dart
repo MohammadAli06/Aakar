@@ -1,11 +1,9 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:image/image.dart' as imaging;
-import 'package:path_provider/path_provider.dart';
 import '../data/commerce_repository.dart';
 import '../domain/commerce_engine.dart';
+import '../domain/photo_enhancement.dart';
 import 'craft_forms.dart';
 import 'craft_widgets.dart';
 
@@ -21,6 +19,7 @@ class _ProductStudioScreenState extends ConsumerState<ProductStudioScreen> {
   int step = 0;
   Record draft = {};
   bool working = false, verified = false;
+  PhotoPrep? prepared;
   final transcript = TextEditingController();
   String t(String en, String hi) => bilingual(context, en, hi);
   String catalogText(String key) => t(
@@ -34,6 +33,10 @@ class _ProductStudioScreenState extends ConsumerState<ProductStudioScreen> {
     final repo = ref.read(commerceProvider);
     draft = {...?repo.lookup('products', widget.productId)};
     transcript.text = '${draft['transcript'] ?? ''}';
+    prepared = photoPrepOptions
+        .where((option) => option.mode.name == '${draft['prepared']}')
+        .map((option) => option.mode)
+        .firstOrNull;
     if (widget.productId != null) step = 2;
   }
 
@@ -48,26 +51,47 @@ class _ProductStudioScreenState extends ConsumerState<ProductStudioScreen> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
   }
 
-  Future<void> enhance() async {
+  /// Back always moves through the wizard first; only step 0 leaves the studio.
+  void handleBack() {
+    if (step > 0) {
+      setState(() => step -= 1);
+      return;
+    }
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/workspace/products');
+    }
+  }
+
+  bool _isPhotoFile(String source) =>
+      source.startsWith('/') || source.contains(':\\');
+
+  /// Prepare the photo from the untouched original, so switching between
+  /// options never stacks one correction on top of another.
+  Future<void> prepare(PhotoPrep mode) async {
     if (working) return;
+    final source = '${draft['original_image'] ?? draft['image']}';
+    if (!_isPhotoFile(source)) {
+      // Sample illustrations are drawn, and a photo already stored on the
+      // server would have to be downloaded first — neither can be prepared here.
+      message(source.startsWith('http')
+          ? t('This photo is stored on the server. Take or choose it again to prepare it here.',
+              'यह फ़ोटो सर्वर पर है। यहाँ तैयार करने के लिए इसे दोबारा लें या चुनें।')
+          : t('Preparation applies to a real photo. This is a sample illustration.',
+              'यह तैयारी असली फ़ोटो पर लागू होती है। यह नमूना चित्र है।'));
+      return;
+    }
     setState(() => working = true);
     try {
-      final source = '${draft['original_image'] ?? draft['image']}';
-      if (source == 'basket' || source == 'pottery') {
-        draft['image'] = source;
-      } else {
-        final decoded = imaging.decodeImage(await File(source).readAsBytes());
-        if (decoded == null) throw WorkflowError('Cannot decode photo');
-        // Modest exposure adjustment only. No generative replacement or shape/colour redesign.
-        final result = imaging.adjustColor(decoded, brightness: 1.04);
-        final dir = await getApplicationDocumentsDirectory();
-        final path =
-            '${dir.path}/enhanced-${DateTime.now().microsecondsSinceEpoch}.jpg';
-        await File(path).writeAsBytes(imaging.encodeJpg(result, quality: 94));
+      final path = await preparePhotoFile(source, mode);
+      if (!mounted) return;
+      setState(() {
+        draft['original_image'] = source;
         draft['image'] = path;
-      }
-      draft['original_image'] = source;
-      if (mounted) setState(() => step = 1);
+        draft['prepared'] = mode.name;
+        prepared = mode;
+      });
     } catch (_) {
       message(t('Photo could not be processed. Try another photo.',
           'फ़ोटो प्रोसेस नहीं हुई। दूसरी फ़ोटो चुनें।'));
@@ -75,6 +99,12 @@ class _ProductStudioScreenState extends ConsumerState<ProductStudioScreen> {
       if (mounted) setState(() => working = false);
     }
   }
+
+  void useOriginal() => setState(() {
+        draft['image'] = draft['original_image'];
+        draft['prepared'] = 'original';
+        prepared = null;
+      });
 
   Future<void> details() async {
     final text = transcript.text.trim();
@@ -203,189 +233,291 @@ class _ProductStudioScreenState extends ConsumerState<ProductStudioScreen> {
         .where((p) =>
             p['category'] == draft['category'] && p['status'] == 'published')
         .toList();
-    return Scaffold(
-        appBar: AppBar(title: Text(t('Product studio', 'उत्पाद स्टूडियो'))),
-        body: SafeArea(
-            child: ListView(padding: const EdgeInsets.all(20), children: [
-          LinearProgressIndicator(
-              value: (step + 1) / 4,
-              color: const Color(0xFF285448),
-              backgroundColor: const Color(0xFFE4E9DE)),
-          const SizedBox(height: 14),
-          Text(
-              '${step + 1} / 4 · ${t('Photo → catalog → review → pricing', 'फ़ोटो → कैटलॉग → जाँच → कीमत')}',
-              style: const TextStyle(fontSize: 10)),
-          if (step == 0) ...[
-            CraftHeading(t('Let your craft shine', 'अपने शिल्प को निखारें'),
-                subtitle: t(
-                    'Use natural light, center the whole product, choose a clear angle, and keep the original colour and texture visible.',
-                    'प्राकृतिक रोशनी में पूरा उत्पाद बीच में रखें। असली रंग और बनावट साफ़ दिखें।')),
-            Center(
-                child: CraftImage('${draft['image'] ?? 'pottery'}', size: 240)),
-            CraftButton(t('Take a photo', 'फ़ोटो लें'),
-                icon: Icons.camera_alt_outlined, onPressed: () async {
-              final path = await pickEvidence(context, camera: true);
-              if (path != null && mounted)
-                setState(() {
-                  draft['image'] = path;
-                  draft['original_image'] = path;
-                });
-            }),
-            CraftButton(t('Choose from gallery', 'गैलरी से चुनें'),
-                secondary: true, onPressed: () async {
-              final path = await pickEvidence(context);
-              if (path != null && mounted)
-                setState(() {
-                  draft['image'] = path;
-                  draft['original_image'] = path;
-                });
-            }),
-            CraftButton(
-                t('Use sample illustration (demo)', 'नमूना चित्र (डेमो)'),
-                secondary: true,
-                onPressed: () => setState(() {
-                      draft['image'] = 'basket';
-                      draft['original_image'] = 'basket';
-                    })),
-            if (draft['image'] != null)
-              CraftButton(
-                  working
-                      ? t('Preparing…', 'तैयार हो रहा है…')
-                      : t('Preview gentle enhancement', 'हल्का सुधार देखें'),
-                  onPressed: working ? null : enhance)
-          ],
-          if (step == 1) ...[
-            CraftHeading(
-                t('Authentic, before everything', 'सबसे पहले प्रामाणिकता'),
-                subtitle: t(
-                    'Original retained. A small lighting adjustment only; no redesign or generated product details.',
-                    'मूल फ़ोटो सुरक्षित। केवल रोशनी का हल्का सुधार; उत्पाद नहीं बदला।')),
-            Row(children: [
-              Expanded(
-                  child: Column(children: [
-                CraftImage('${draft['original_image']}', size: 150),
-                Text(t('Original', 'मूल'))
-              ])),
-              Expanded(
-                  child: Column(children: [
-                CraftImage('${draft['image']}', size: 150),
-                Text(t('Enhanced preview', 'सुधार के बाद'))
-              ]))
-            ]),
-            CraftButton(t('Keep original instead', 'मूल फ़ोटो रखें'),
-                secondary: true,
-                onPressed: () =>
-                    setState(() => draft['image'] = draft['original_image'])),
-            const SizedBox(height: 16),
-            TextField(
-                controller: transcript,
-                minLines: 4,
-                maxLines: 7,
-                decoration: InputDecoration(
-                    labelText: t('Tell us about your product',
-                        'अपने उत्पाद के बारे में बताएँ'),
-                    hintText: t(
-                        'Material, size, how it is made, and its story…',
-                        'सामग्री, माप, कैसे बनाया और कहानी…'),
-                    suffixIcon: VoiceFieldButton(controller: transcript))),
-            CraftButton(t('Review catalog details', 'कैटलॉग विवरण जाँचें'),
-                onPressed: details)
-          ],
-          if (step == 2) ...[
-            CraftHeading(
-                t('Your words. Your approval.', 'आपकी बात। आपकी स्वीकृति।'),
-                subtitle: t(
-                    'Read or listen, correct any field by voice, then approve. This is product verification, not identity verification.',
-                    'पढ़ें या सुनें, बोलकर सुधारें और स्वीकारें। यह उत्पाद की जाँच है, पहचान की नहीं।')),
-            CraftCard(
+    final prep = prepared;
+    final prepLabel = prep == null
+        ? t('As photographed', 'जैसी खींची गई')
+        : t('Prepared · ${photoPrepOption(prep).labelEn}',
+            'तैयार · ${photoPrepOption(prep).labelHi}');
+    return PopScope(
+        canPop: step == 0,
+        onPopInvokedWithResult: (didPop, _) {
+          if (didPop) return;
+          setState(() => step -= 1);
+        },
+        child: Scaffold(
+            appBar: AppBar(
+                automaticallyImplyLeading: false,
+                title: Text(t('Product studio', 'उत्पाद स्टूडियो')),
+                actions: [
+                  IconButton(
+                      tooltip: step > 0
+                          ? t('Previous step', 'पिछला चरण')
+                          : t('Close studio', 'स्टूडियो बंद करें'),
+                      onPressed: handleBack,
+                      icon: Icon(
+                          step > 0 ? Icons.arrow_back : Icons.close_rounded)),
+                  const SizedBox(width: 4),
+                ]),
+            body: SafeArea(
+                child: ListView(padding: const EdgeInsets.all(20), children: [
+              LinearProgressIndicator(
+                  value: (step + 1) / 4,
+                  color: const Color(0xFF285448),
+                  backgroundColor: const Color(0xFFE4E9DE)),
+              const SizedBox(height: 14),
+              Text(
+                  '${step + 1} / 4 · ${t('Photo → catalog → review → pricing', 'फ़ोटो → कैटलॉग → जाँच → कीमत')}',
+                  style: const TextStyle(fontSize: 10)),
+              if (step == 0) ...[
+                CraftHeading(t('Let your craft shine', 'अपने शिल्प को निखारें'),
+                    subtitle: t(
+                        'Use natural light, center the whole product, choose a clear angle, and keep the original colour and texture visible.',
+                        'प्राकृतिक रोशनी में पूरा उत्पाद बीच में रखें। असली रंग और बनावट साफ़ दिखें।')),
+                Center(
+                    child: CraftImage('${draft['image'] ?? 'pottery'}',
+                        size: 240)),
+                CraftButton(t('Take a photo', 'फ़ोटो लें'),
+                    icon: Icons.camera_alt_outlined, onPressed: () async {
+                  final path = await pickEvidence(context, camera: true);
+                  if (path != null && mounted)
+                    setState(() {
+                      draft['image'] = path;
+                      draft['original_image'] = path;
+                    });
+                }),
+                CraftButton(t('Choose from gallery', 'गैलरी से चुनें'),
+                    secondary: true, onPressed: () async {
+                  final path = await pickEvidence(context);
+                  if (path != null && mounted)
+                    setState(() {
+                      draft['image'] = path;
+                      draft['original_image'] = path;
+                    });
+                }),
+                CraftButton(
+                    t('Use sample illustration (demo)', 'नमूना चित्र (डेमो)'),
+                    secondary: true,
+                    onPressed: () => setState(() {
+                          draft['image'] = 'basket';
+                          draft['original_image'] = 'basket';
+                        })),
+                if (draft['image'] != null)
+                  CraftButton(
+                      t('Next: prepare the photo', 'आगे: फ़ोटो तैयार करें'),
+                      onPressed: () => setState(() => step = 1))
+              ],
+              if (step == 1) ...[
+                CraftHeading(
+                    t('Choose how to prepare this photo',
+                        'यह फ़ोटो कैसे तैयार करें'),
+                    subtitle: t(
+                        'Each choice is one plain image operation, not a style or a filter. Your original is kept in full, and nothing about the product is invented.',
+                        'हर विकल्प एक सीधा इमेज ऑपरेशन है, कोई स्टाइल या फ़िल्टर नहीं। मूल फ़ोटो पूरी सुरक्षित रहती है और उत्पाद में कुछ जोड़ा नहीं जाता।')),
+                for (final option in photoPrepOptions)
+                  _PrepOptionCard(
+                      option: option,
+                      selected: prepared == option.mode,
+                      busy: working,
+                      onTap: () => prepare(option.mode)),
+                const SizedBox(height: 18),
+                Row(children: [
+                  Expanded(
+                      child: Column(children: [
+                    CraftImage('${draft['original_image']}', size: 150),
+                    const SizedBox(height: 6),
+                    Text(t('Original', 'मूल'),
+                        style: const TextStyle(fontSize: 11))
+                  ])),
+                  Expanded(
+                      child: Column(children: [
+                    CraftImage('${draft['image']}', size: 150),
+                    const SizedBox(height: 6),
+                    Text(prepLabel,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 11))
+                  ]))
+                ]),
+                if (prep != null)
+                  CraftButton(
+                      t('Use the original photo instead', 'मूल फ़ोटो ही रखें'),
+                      secondary: true,
+                      onPressed: working ? null : useOriginal),
+                const SizedBox(height: 16),
+                TextField(
+                    controller: transcript,
+                    minLines: 4,
+                    maxLines: 7,
+                    decoration: InputDecoration(
+                        labelText: t('Tell us about your product',
+                            'अपने उत्पाद के बारे में बताएँ'),
+                        hintText: t(
+                            'Material, size, how it is made, and its story…',
+                            'सामग्री, माप, कैसे बनाया और कहानी…'),
+                        suffixIcon: VoiceFieldButton(controller: transcript))),
+                CraftButton(t('Review catalog details', 'कैटलॉग विवरण जाँचें'),
+                    onPressed: details)
+              ],
+              if (step == 2) ...[
+                CraftHeading(
+                    t('Your words. Your approval.', 'आपकी बात। आपकी स्वीकृति।'),
+                    subtitle: t(
+                        'Read or listen, correct any field by voice, then approve. This is product verification, not identity verification.',
+                        'पढ़ें या सुनें, बोलकर सुधारें और स्वीकारें। यह उत्पाद की जाँच है, पहचान की नहीं।')),
+                CraftCard(
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                      Text(catalogText('title'),
+                          style: const TextStyle(
+                              fontSize: 20, fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 10),
+                      Text(catalogText('description'),
+                          style: const TextStyle(fontSize: 13, height: 1.6)),
+                      DetailRow(
+                          t('Photo preparation', 'फ़ोटो तैयारी'), prepLabel),
+                      DetailRow(t('Material', 'सामग्री'),
+                          '${draft['material'] ?? ''}'),
+                      DetailRow(t('Dimensions', 'माप'),
+                          '${draft['dimensions'] ?? ''}'),
+                      DetailRow(t('Craft', 'शिल्प'), '${draft['craft'] ?? ''}'),
+                      CraftButton(
+                          t('Listen to my catalog', 'मेरा कैटलॉग सुनें'),
+                          secondary: true,
+                          onPressed: () => speakCraft(context,
+                              '${catalogText('title')}. ${catalogText('description')}. ${draft['material'] ?? ''}. ${draft['dimensions'] ?? ''}.')),
+                      CraftButton(
+                          t('Replace product photo', 'उत्पाद की फ़ोटो बदलें'),
+                          secondary: true,
+                          onPressed: () => setState(() {
+                                verified = false;
+                                step = 0;
+                              })),
+                      CraftButton(
+                          t('Correct details / voice edit',
+                              'विवरण / आवाज़ से सुधारें'),
+                          secondary: true,
+                          onPressed: details),
+                      CheckboxListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(
+                              t('I reviewed and confirm these product details',
+                                  'मैंने विवरण जाँचे हैं और सही हैं'),
+                              style: const TextStyle(fontSize: 12)),
+                          value: verified,
+                          onChanged: (v) =>
+                              setState(() => verified = v == true))
+                    ])),
+                CraftButton(t('Continue to pricing', 'कीमत तय करें'),
+                    onPressed: verified ? price : null)
+              ],
+              if (step == 3) ...[
+                CraftHeading(
+                    t('Handmade deserves a fair price',
+                        'हस्तनिर्मित की उचित कीमत'),
+                    subtitle: t(
+                        'Your labour matters. Recommendations never go below your costs.',
+                        'आपकी मेहनत की कीमत है। सुझाव लागत से कम नहीं होगा।')),
+                CraftCard(
+                    child: Column(children: [
+                  DetailRow(
+                      t('Material', 'सामग्री'), money(draft['material_cost'])),
+                  DetailRow(t('Labour', 'श्रम'),
+                      '${draft['labour_hours']} h × ${money(draft['hourly_rate'])}'),
+                  DetailRow(
+                      t('Overhead', 'अन्य खर्च'), money(draft['overhead'])),
+                  const Divider(),
+                  DetailRow(
+                      t('Protected cost floor', 'न्यूनतम लागत'), money(floor)),
+                  const SizedBox(height: 16),
+                  Text('${money(min)} – ${money(max)}',
+                      style: const TextStyle(
+                          fontSize: 27,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF285448))),
+                  Text(
+                      t('Suggested range · costs + craftsmanship margin',
+                          'सुझाई सीमा · लागत + शिल्प लाभ'),
+                      style: const TextStyle(fontSize: 11)),
+                  const SizedBox(height: 12),
+                  Text(
+                      t('Handmade demo comparables below are context, not live market prices. A low comparable never reduces your cost floor.',
+                          'नीचे हस्तनिर्मित डेमो उदाहरण हैं, लाइव बाज़ार कीमतें नहीं। कम उदाहरण आपकी लागत सीमा नहीं घटाता।'),
+                      style: const TextStyle(fontSize: 11)),
+                  ...comparable.take(3).map(
+                      (p) => DetailRow('${p['title']}', money(p['price']))),
+                  CraftButton(t('Adjust costs', 'लागत बदलें'),
+                      secondary: true, onPressed: price)
+                ])),
+                CraftButton(
+                    t('Set final price & save', 'आखिरी कीमत तय करके सहेजें'),
+                    onPressed: save),
+                Text(
+                    t('This saves a product. Publishing is a separate action in My Products.',
+                        'यह उत्पाद सहेजता है। मेरे उत्पाद से अलग से प्रकाशित करें।'),
+                    style: const TextStyle(fontSize: 11))
+              ],
+              const SizedBox(height: 30),
+            ]))));
+  }
+}
+
+/// One preparation choice: a reason to pick it, plus whether it is applied.
+class _PrepOptionCard extends StatelessWidget {
+  final PhotoPrepOption option;
+  final bool selected;
+  final bool busy;
+  final VoidCallback onTap;
+  const _PrepOptionCard(
+      {required this.option,
+      required this.selected,
+      required this.busy,
+      required this.onTap});
+  @override
+  Widget build(BuildContext context) => CraftCard(
+      color: selected ? const Color(0xFFE9F2EC) : null,
+      child: InkWell(
+          onTap: busy ? null : onTap,
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Padding(
+                padding: const EdgeInsets.only(top: 1),
+                child: Icon(
+                    selected
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_unchecked,
+                    size: 20,
+                    color: selected
+                        ? const Color(0xFF285448)
+                        : const Color(0xFF9AA69C))),
+            const SizedBox(width: 12),
+            Expanded(
                 child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                  Text(catalogText('title'),
+                  Text(bilingual(context, option.labelEn, option.labelHi),
                       style: const TextStyle(
-                          fontSize: 20, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 10),
-                  Text(catalogText('description'),
-                      style: const TextStyle(fontSize: 13, height: 1.6)),
-                  DetailRow(
-                      t('Material', 'सामग्री'), '${draft['material'] ?? ''}'),
-                  DetailRow(
-                      t('Dimensions', 'माप'), '${draft['dimensions'] ?? ''}'),
-                  DetailRow(t('Craft', 'शिल्प'), '${draft['craft'] ?? ''}'),
-                  CraftButton(t('Listen to my catalog', 'मेरा कैटलॉग सुनें'),
-                      secondary: true,
-                      onPressed: () => speakCraft(context,
-                          '${catalogText('title')}. ${catalogText('description')}. ${draft['material'] ?? ''}. ${draft['dimensions'] ?? ''}.')),
-                  CraftButton(
-                      t('Replace product photo', 'उत्पाद की फ़ोटो बदलें'),
-                      secondary: true,
-                      onPressed: () => setState(() {
-                            verified = false;
-                            step = 0;
-                          })),
-                  CraftButton(
-                      t('Correct details / voice edit',
-                          'विवरण / आवाज़ से सुधारें'),
-                      secondary: true,
-                      onPressed: details),
-                  CheckboxListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(
-                          t('I reviewed and confirm these product details',
-                              'मैंने विवरण जाँचे हैं और सही हैं'),
-                          style: const TextStyle(fontSize: 12)),
-                      value: verified,
-                      onChanged: (v) => setState(() => verified = v == true))
-                ])),
-            CraftButton(t('Continue to pricing', 'कीमत तय करें'),
-                onPressed: verified ? price : null)
-          ],
-          if (step == 3) ...[
-            CraftHeading(
-                t('Handmade deserves a fair price', 'हस्तनिर्मित की उचित कीमत'),
-                subtitle: t(
-                    'Your labour matters. Recommendations never go below your costs.',
-                    'आपकी मेहनत की कीमत है। सुझाव लागत से कम नहीं होगा।')),
-            CraftCard(
-                child: Column(children: [
-              DetailRow(
-                  t('Material', 'सामग्री'), money(draft['material_cost'])),
-              DetailRow(t('Labour', 'श्रम'),
-                  '${draft['labour_hours']} h × ${money(draft['hourly_rate'])}'),
-              DetailRow(t('Overhead', 'अन्य खर्च'), money(draft['overhead'])),
-              const Divider(),
-              DetailRow(
-                  t('Protected cost floor', 'न्यूनतम लागत'), money(floor)),
-              const SizedBox(height: 16),
-              Text('${money(min)} – ${money(max)}',
-                  style: const TextStyle(
-                      fontSize: 27,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF285448))),
-              Text(
-                  t('Suggested range · costs + craftsmanship margin',
-                      'सुझाई सीमा · लागत + शिल्प लाभ'),
-                  style: const TextStyle(fontSize: 11)),
-              const SizedBox(height: 12),
-              Text(
-                  t('Handmade demo comparables below are context, not live market prices. A low comparable never reduces your cost floor.',
-                      'नीचे हस्तनिर्मित डेमो उदाहरण हैं, लाइव बाज़ार कीमतें नहीं। कम उदाहरण आपकी लागत सीमा नहीं घटाता।'),
-                  style: const TextStyle(fontSize: 11)),
-              ...comparable
-                  .take(3)
-                  .map((p) => DetailRow('${p['title']}', money(p['price']))),
-              CraftButton(t('Adjust costs', 'लागत बदलें'),
-                  secondary: true, onPressed: price)
-            ])),
-            CraftButton(
-                t('Set final price & save', 'आखिरी कीमत तय करके सहेजें'),
-                onPressed: save),
-            Text(
-                t('This saves a product. Publishing is a separate action in My Products.',
-                    'यह उत्पाद सहेजता है। मेरे उत्पाद से अलग से प्रकाशित करें।'),
-                style: const TextStyle(fontSize: 11))
-          ],
-          const SizedBox(height: 30),
-        ])));
-  }
+                          fontSize: 14, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 5),
+                  Text(bilingual(context, option.reasonEn, option.reasonHi),
+                      style: const TextStyle(
+                          fontSize: 11.5,
+                          height: 1.55,
+                          color: Color(0xFF6E776E))),
+                  if (selected) ...[
+                    const SizedBox(height: 9),
+                    Text(
+                        bilingual(
+                            context,
+                            'Applied to the preview below. Change or undo any time.',
+                            'नीचे पूर्वावलोकन में लागू। कभी भी बदलें या हटाएँ।'),
+                        style: const TextStyle(
+                            fontSize: 10.5, color: Color(0xFF285448)))
+                  ],
+                  if (busy && selected) ...[
+                    const SizedBox(height: 10),
+                    const LinearProgressIndicator(
+                        color: Color(0xFF285448),
+                        backgroundColor: Color(0xFFDDE7DF))
+                  ]
+                ]))
+          ])));
 }

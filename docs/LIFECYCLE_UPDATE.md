@@ -12,7 +12,7 @@ Incorporated at the user's request on 2026-09-10. Source: [preserved PDF](source
 | 4. Vague dispatch | Ready → packaging checklist/photo → shipping method → label/reference → tracking ID → Dispatched/In Transit/Delivered; artisan-booked small-order courier and cluster consolidation; coordinate, do not operate logistics | 30, 31, 43, 49 |
 | 5. Exception handling | Quality mismatch, unfulfillable quantity, damage, cancellation, incorrect received count, disputed payment → Flag an Issue → manual admin with order/terms/payment/production/fulfillment/evidence; 470 received of 500 example | 31, 42, 47 |
 | 6. Inspection | Delivered → buyer inspection → acceptance or issue; configurable window, no universal 48-hour rule | 31, 44, 48 |
-| 7. Readiness ambiguity | Internal CraftConnect Ready includes images/description/price/MOQ/capacity/lead time/availability; external channel-specific states remain independent | 13, 14, 41, 50 |
+| 7. Readiness ambiguity | Internal Aakar Ready includes images/description/price/MOQ/capacity/lead time/availability; external channel-specific states remain independent | 13, 14, 41, 50 |
 | 8. Unstructured negotiation | Quantity/MOQ/unit price/target date/lead time/customization/delivery/payment/specifications from reviewed voice/chat; 500 available in 40 rather than requested 30 days = Needs negotiation | 24, 27, 28 |
 | 9. Repeat business mechanism | Completed → Saved Supplier → Order History → Reorder; hotel returns to Meena after six months, changes 500 baskets to 700, creates new requirement | 16, 32 |
 | 10. Bidding distraction | Future optional Artisan-initiated Bulk Clearance; 80 surplus baskets to eligible/pre-verified buyers; no live MVP bidding engine | 33–39, 50 |

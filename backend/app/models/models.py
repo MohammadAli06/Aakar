@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 from sqlalchemy import (
     Column, String, Float, Boolean, DateTime, Text,
-    ForeignKey, JSON, Enum as SAEnum
+    ForeignKey, JSON, UniqueConstraint, Enum as SAEnum
 )
 from sqlalchemy.orm import relationship
 import enum
@@ -50,15 +50,37 @@ class B2BStatus(str, enum.Enum):
     ready = "ready"
 
 
-# ── Artisan ──────────────────────────────────────────────────────────────
+class AccountRole(str, enum.Enum):
+    artisan = "artisan"
+    buyer = "buyer"
+
+
+# ── Account identity ─────────────────────────────────────────────────────
+# Role is assigned at registration. Existing phone accounts cannot change it.
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(String, primary_key=True, default=_uuid)
+    firebase_uid = Column(String, unique=True, nullable=False, index=True)
+    role = Column(SAEnum(AccountRole), nullable=False)
+    name = Column(String(200), nullable=True)
+    phone = Column(String(20), nullable=True, unique=True)
+    email = Column(String(320), nullable=True, unique=True)
+    language_pref = Column(String(10), default="hi")
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    artisan_profile = relationship("Artisan", back_populates="user", uselist=False)
+    buyer_profile = relationship("Buyer", back_populates="user", uselist=False)
+
+
+# ── Artisan profile ──────────────────────────────────────────────────────
 class Artisan(Base):
     __tablename__ = "artisans"
 
     id = Column(String, primary_key=True, default=_uuid)
-    firebase_uid = Column(String, unique=True, nullable=False, index=True)
-    name = Column(String(200), nullable=False)
-    phone = Column(String(20), nullable=False, unique=True)
-    language_pref = Column(String(10), default="hi")
+    user_id = Column(String, ForeignKey("users.id"), unique=True, nullable=False, index=True)
     state = Column(String(100), nullable=True)
     district = Column(String(100), nullable=True)
     craft_category = Column(SAEnum(CraftCategory), default=CraftCategory.other)
@@ -67,10 +89,43 @@ class Artisan(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    user = relationship("User", back_populates="artisan_profile")
     products = relationship("Product", back_populates="artisan")
 
 
+# ── Buyer profile ────────────────────────────────────────────────────────
+class Buyer(Base):
+    __tablename__ = "buyers"
+
+    id = Column(String, primary_key=True, default=_uuid)
+    user_id = Column(String, ForeignKey("users.id"), unique=True, nullable=False, index=True)
+    business_name = Column(String(200), nullable=True)
+    business_type = Column(String(100), nullable=True)
+    industry = Column(String(100), nullable=True)
+    state = Column(String(100), nullable=True)
+    district = Column(String(100), nullable=True)
+    is_verified = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = relationship("User", back_populates="buyer_profile")
+
+
 # ── Product ───────────────────────────────────────────────────────────────
+class AccountVerification(Base):
+    __tablename__ = "account_verifications"
+    __table_args__ = (UniqueConstraint('user_id', 'role'),)
+
+    id = Column(String, primary_key=True, default=_uuid)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    role = Column(String(20), nullable=False)
+    status = Column(String(30), nullable=False, default="not_started")
+    evidence = Column(JSON, nullable=False, default=dict)
+    consent_at = Column(DateTime, nullable=True)
+    submitted_at = Column(DateTime, nullable=True)
+    review_note = Column(Text, nullable=True)
+
+
 class Product(Base):
     __tablename__ = "products"
 
@@ -199,9 +254,35 @@ class VerificationLog(Base):
     id = Column(String, primary_key=True, default=_uuid)
     entity_type = Column(String(50))            # product_image, listing, price, b2b
     entity_id = Column(String, nullable=False)
-    artisan_id = Column(String, ForeignKey("artisans.id"), nullable=False)
+    artisan_id = Column(String, ForeignKey("artisans.id"), nullable=True)
     previous_status = Column(SAEnum(VerificationStatus))
     new_status = Column(SAEnum(VerificationStatus))
     artisan_action = Column(String(20))          # accept, edit, reject
     corrected_value = Column(JSON, nullable=True)
     timestamp = Column(DateTime, default=datetime.utcnow)
+
+
+# ── Product moderation state ──────────────────────────────────────────────
+# Kept in its own table so existing product tables need no schema migration.
+class ProductModeration(Base):
+    __tablename__ = "product_moderation"
+
+    id = Column(String, primary_key=True, default=_uuid)
+    product_id = Column(String, ForeignKey("products.id"), nullable=False, unique=True, index=True)
+    status = Column(String(30), nullable=False, default="clear")   # clear | flagged | blocked
+    note = Column(Text, nullable=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+# ── Administrator audit trail ─────────────────────────────────────────────
+class AdminAuditLog(Base):
+    __tablename__ = "admin_audit_log"
+
+    id = Column(String, primary_key=True, default=_uuid)
+    actor = Column(String(200), nullable=False, default="admin")
+    action = Column(String(60), nullable=False)
+    entity_type = Column(String(50), nullable=False)
+    entity_id = Column(String, nullable=False)
+    summary = Column(Text, nullable=True)
+    note = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)

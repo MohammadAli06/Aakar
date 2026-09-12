@@ -8,8 +8,10 @@ from sqlalchemy import select
 from pydantic import BaseModel
 from typing import Optional, List
 
+from app.core.auth_deps import require_artisan_profile
 from app.core.database import get_db
-from app.models.models import PriceRecommendation, VerificationStatus
+from app.core.ownership import load_owned_product
+from app.models.models import Artisan, PriceRecommendation, VerificationStatus
 from app.services.pricing_service import compute_price_recommendation
 
 router = APIRouter()
@@ -56,6 +58,7 @@ class SetFinalPriceRequest(BaseModel):
 @router.post("/recommend", response_model=PricingResponse)
 async def recommend_price(
     data: PricingRequest,
+    artisan: Artisan = Depends(require_artisan_profile),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -65,6 +68,8 @@ async def recommend_price(
     - Craftsmanship multiplier adjusts within market range
     - Explanation templated into plain language (EN + HI)
     """
+    await load_owned_product(db, data.product_id, artisan)
+
     result = await compute_price_recommendation(
         craft_category=data.craft_category,
         material_cost=data.material_cost,
@@ -113,12 +118,15 @@ async def recommend_price(
 @router.post("/set-final-price")
 async def set_final_price(
     data: SetFinalPriceRequest,
+    artisan: Artisan = Depends(require_artisan_profile),
     db: AsyncSession = Depends(get_db),
 ):
     """
     Artisan sets final price after reviewing the recommendation.
     Logged for trust + model improvement.
     """
+    await load_owned_product(db, data.product_id, artisan)
+
     result = await db.execute(
         select(PriceRecommendation).where(PriceRecommendation.product_id == data.product_id)
     )
@@ -134,7 +142,7 @@ async def set_final_price(
     log = VerificationLog(
         entity_type="price",
         entity_id=rec.id,
-        artisan_id="",
+        artisan_id=artisan.id,
         previous_status=VerificationStatus.ai_generated,
         new_status=VerificationStatus.approved,
         artisan_action=data.artisan_action,
