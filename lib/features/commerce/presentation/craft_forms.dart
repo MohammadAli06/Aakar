@@ -58,6 +58,19 @@ class _CraftFormState extends State<_CraftForm> {
       if (!f.toggle)
         _controllers[f.key] =
             TextEditingController(text: '${values[f.key] ?? ''}');
+      if (!f.toggle) {
+        final raw = values[f.key];
+        String initial;
+        if (f.numeric && raw != null) {
+          final d = double.tryParse('$raw');
+          initial = (d != null && d == d.truncateToDouble())
+              ? d.toInt().toString()
+              : '$raw';
+        } else {
+          initial = '${raw ?? ''}';
+        }
+        _controllers[f.key] = TextEditingController(text: initial);
+      }
     }
   }
 
@@ -118,7 +131,7 @@ class _CraftFormState extends State<_CraftForm> {
                                   maxLines: f.multiline ? 3 : 1,
                                   keyboardType: f.numeric
                                       ? const TextInputType.numberWithOptions(
-                                          decimal: true)
+                                          decimal: false)
                                       : TextInputType.text,
                                   decoration: InputDecoration(
                                       labelText: bilingual(context, f.en, f.hi),
@@ -313,6 +326,9 @@ const productFields = [
   CraftField('story', 'Craft story', 'शिल्प की कहानी', multiline: true),
   CraftField('location', 'Origin / pickup location', 'स्थान / पिकअप',
       required: true),
+  CraftField('customizable', 'Buyer can ask for changes / size / colour',
+      'खरीदार बदलाव / आकार / रंग माँग सकते हैं',
+      toggle: true),
   CraftField('moq', 'Minimum order quantity', 'न्यूनतम ऑर्डर मात्रा',
       numeric: true),
   CraftField('stock', 'Current available stock', 'अभी उपलब्ध स्टॉक',

@@ -24,6 +24,31 @@ class WorkflowTests(unittest.TestCase):
         p.update(stock=0, customizable=False, external={})
         self.assertEqual(readiness(p), [])
 
+    def test_availability_is_owned_boolean_and_preserves_catalog(self):
+        before = self.state
+        for role, actor in [('buyer', 'buyer'), ('artisan', 'sakhi')]:
+            with self.assertRaises(ValueError):
+                self.act('availability', dict(id='basket', available=False), role, actor)
+            self.assertEqual(self.state, before)
+        for value in [None, 'false', 0]:
+            with self.assertRaises(ValueError):
+                self.act('availability', dict(id='basket', available=value), 'artisan')
+            self.assertEqual(self.state, before)
+        product = dict(self.state['products'][0])
+        self.act('availability', dict(id='basket', available=False, price=1), 'artisan')
+        self.assertEqual(self.state['products'][0], {**product, 'available': False})
+        with self.assertRaises(ValueError):
+            self.act('inquiry', dict(product_id='basket', quantity=50, lead_days=30, location='Mumbai'))
+        self.act('availability', dict(id='basket', available=True), 'artisan')
+        self.act('inquiry', dict(product_id='basket', quantity=50, lead_days=30, location='Mumbai'))
+        self.assertEqual(len(self.state['inquiries']), 1)
+
+    def test_pausing_availability_preserves_orders(self):
+        self.order()
+        orders = self.state['orders']
+        self.act('availability', dict(id='basket', available=False), 'artisan')
+        self.assertEqual(self.state['orders'], orders)
+
     def test_sample_gate_and_duplicate_order(self):
         self.order(True)
         with self.assertRaises(ValueError):

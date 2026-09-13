@@ -64,6 +64,50 @@ void main() {
 
   setUp(() => state = CommerceEngine.seed());
 
+  test('Availability changes only the owned product operational status', () {
+    final before = copyRecord(state);
+    for (final identity in [('buyer', 'buyer'), ('artisan', 'sakhi')]) {
+      expect(
+          () => act('availability', {'id': 'basket', 'available': false},
+              identity.$1, identity.$2),
+          throwsA(isA<WorkflowError>()));
+      expect(state, before);
+    }
+    for (final value in [null, 'false', 0]) {
+      expect(
+          () => act(
+              'availability', {'id': 'basket', 'available': value}, 'artisan'),
+          throwsA(isA<WorkflowError>()));
+      expect(state, before);
+    }
+    final product = copyRecord(records(state['products']).first);
+    act('availability', {'id': 'basket', 'available': false, 'price': 1},
+        'artisan');
+    expect(records(state['products']).first, {...product, 'available': false});
+    expect(inquire, throwsA(isA<WorkflowError>()));
+    final matches = CommerceEngine.matches(state, {
+      'product': 'bamboo basket',
+      'quantity': 50,
+      'lead_days': 30,
+      'location': 'Mumbai',
+    });
+    final paused = matches.firstWhere((p) => p['id'] == 'basket');
+    expect(paused['feasible'], false);
+    expect(paused['gaps'], contains('Currently unavailable'));
+    act('availability', {'id': 'basket', 'available': true}, 'artisan');
+    inquire();
+    expect(records(state['inquiries']), hasLength(1));
+  });
+
+  test('Pausing availability preserves existing order commitments', () {
+    inquire();
+    act('quote', quote(), 'artisan');
+    accept();
+    final orders = copyRecord(state)['orders'];
+    act('availability', {'id': 'basket', 'available': false}, 'artisan');
+    expect(state['orders'], orders);
+  });
+
   test(
       'Internal readiness is independent of external readiness and accepts false customization / zero stock',
       () {

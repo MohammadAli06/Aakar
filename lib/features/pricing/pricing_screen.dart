@@ -2,10 +2,41 @@ import '../../core/localization/app_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/services/mock_ai_service.dart';
+import '../../core/services/api_client.dart';
 import '../../shared/models/models.dart';
 import '../../shared/widgets/glass_card.dart';
 import '../../shared/widgets/verification_status_chip.dart';
+
+// ── AI analysis result from /pricing/analyze-image ───────────────────────
+
+class _AiAnalysis {
+  final double complexityScore;
+  final String detectedCategory;
+  final String materialTier;
+  final String reasoningEn;
+  final String reasoningHi;
+  final bool isFallback;
+
+  const _AiAnalysis({
+    required this.complexityScore,
+    required this.detectedCategory,
+    required this.materialTier,
+    required this.reasoningEn,
+    required this.reasoningHi,
+    required this.isFallback,
+  });
+
+  factory _AiAnalysis.fromJson(Map<String, dynamic> j) => _AiAnalysis(
+        complexityScore: (j['complexity_score'] as num).toDouble(),
+        detectedCategory: j['detected_category'] as String? ?? 'other',
+        materialTier: j['material_tier'] as String? ?? 'medium',
+        reasoningEn: j['reasoning_en'] as String? ?? '',
+        reasoningHi: j['reasoning_hi'] as String? ?? '',
+        isFallback: j['is_fallback'] as bool? ?? true,
+      );
+}
+
+// ── Main screen ──────────────────────────────────────────────────────────
 
 class PricingScreen extends StatefulWidget {
   final String productId;
@@ -21,33 +52,144 @@ class _PricingScreenState extends State<PricingScreen> {
   double _labourHours = 4;
   double _wagePerHour = 150;
   double _overhead = 200;
+  double _craftsmanshipComplexity = 0.5; // overridden by AI
 
+  // AI image analysis state
+  _AiAnalysis? _aiAnalysis;
+  bool _aiLoading = true;
+  bool _aiChipExpanded = false;
+
+  // Pricing recommendation state
   PriceRecommendation? _recommendation;
   bool _loading = false;
   bool _showCalculation = false;
   bool _approved = false;
+  bool _approving = false;
   double? _finalPrice;
 
   double get _labourCost => _labourHours * _wagePerHour;
   double get _costFloor => _materialCost + _labourCost + _overhead;
 
+  @override
+  void initState() {
+    super.initState();
+    _analyzeImageWithAI();
+  }
+
+  // ── Step 1: Auto-assess complexity via GPT Vision ────────────────────
+
+  Future<void> _analyzeImageWithAI() async {
+    try {
+      final data = await apiClient.post(
+        '/pricing/analyze-image',
+        data: {'product_id': widget.productId},
+      );
+      final analysis = _AiAnalysis.fromJson(data as Map<String, dynamic>);
+      if (mounted) {
+        setState(() {
+          _aiAnalysis = analysis;
+          _aiLoading = false;
+          // Pre-fill slider with AI score
+          _craftsmanshipComplexity = analysis.complexityScore;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _aiLoading = false);
+    }
+  }
+
+  // ── Step 2: Get full pricing recommendation from backend ─────────────
+
   Future<void> _calculate() async {
     setState(() => _loading = true);
-    final rec = await MockAIService.generatePricing(
-      widget.productId,
-      materialCost: _materialCost,
-      labourHours: _labourHours,
-      wagePerHour: _wagePerHour,
-      overhead: _overhead,
-      category: CraftCategory.pottery,
-    );
-    if (mounted) {
-      setState(() {
-        _recommendation = rec;
-        _finalPrice = rec.recommendedMin;
-        _loading = false;
-        _showCalculation = true;
-      });
+    try {
+      final data = await apiClient.post(
+        '/pricing/recommend',
+        data: {
+          'product_id': widget.productId,
+          'craft_category': _aiAnalysis?.detectedCategory ?? 'other',
+          'material_cost': _materialCost,
+          'labour_hours': _labourHours,
+          'wage_per_hour': _wagePerHour,
+          'overhead': _overhead,
+          'craftsmanship_complexity': _craftsmanshipComplexity,
+        },
+      );
+      final json = data as Map<String, dynamic>;
+      final comparables = (json['comparables'] as List<dynamic>? ?? [])
+          .map((c) => MarketComparable(
+                name: c['name'] as String? ?? '',
+                price: (c['price'] as num).toDouble(),
+                source: c['source'] as String? ?? '',
+              ))
+          .toList();
+
+      final rec = PriceRecommendation(
+        id: json['id'] as String,
+        productId: json['product_id'] as String,
+        materialCost: (json['material_cost'] as num).toDouble(),
+        labourCost: (json['labour_cost'] as num).toDouble(),
+        overhead: (json['overhead'] as num).toDouble(),
+        craftsmanshipScore: (json['craftsmanship_score'] as num).toDouble(),
+        recommendedMin: (json['recommended_min'] as num).toDouble(),
+        recommendedMax: (json['recommended_max'] as num).toDouble(),
+        explanationText: json['explanation_text_en'] as String? ?? '',
+        explanationTextHi: json['explanation_text_hi'] as String? ?? '',
+        comparables: comparables,
+        verificationStatus: VerificationStatus.aiGenerated,
+      );
+
+      if (mounted) {
+        setState(() {
+          _recommendation = rec;
+          _finalPrice = rec.recommendedMin;
+          _loading = false;
+          _showCalculation = true;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _loading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not get recommendation: $e'),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+    }
+  }
+
+  // ── Step 3: Persist final price to backend ───────────────────────────
+
+  Future<void> _approveFinalPrice() async {
+    if (_finalPrice == null) return;
+    setState(() => _approving = true);
+    try {
+      await apiClient.post(
+        '/pricing/set-final-price',
+        data: {
+          'product_id': widget.productId,
+          'final_price': _finalPrice,
+          'artisan_action': 'accept',
+        },
+      );
+      if (mounted) {
+        setState(() {
+          _approved = true;
+          _approving = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _approving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not save price: $e'),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
     }
   }
 
@@ -77,7 +219,11 @@ class _PricingScreenState extends State<PricingScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            // Cost inputs section
+            // ── AI Assessment Chip ─────────────────────────────────────
+            _buildAiChip(context),
+            const SizedBox(height: 12),
+
+            // ── Cost inputs section ────────────────────────────────────
             GlassCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -151,11 +297,72 @@ class _PricingScreenState extends State<PricingScreen> {
                       ),
                     ],
                   ),
+
+                  // ── Craftsmanship slider (AI pre-filled) ──────────────
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      const AppText('शिल्पकारी जटिलता  •  Craftsmanship',
+                          style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: AppColors.textSecondary)),
+                      const Spacer(),
+                      if (_aiAnalysis != null && !_aiAnalysis!.isFallback)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.accentGreen.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Row(children: [
+                            const Text('🤖', style: TextStyle(fontSize: 10)),
+                            const SizedBox(width: 3),
+                            AppText('AI',
+                                style: const TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontSize: 9,
+                                    color: AppColors.accentGreen,
+                                    fontWeight: FontWeight.w600)),
+                          ]),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Slider(
+                          value: _craftsmanshipComplexity,
+                          min: 0.0,
+                          max: 1.0,
+                          divisions: 20,
+                          activeColor: AppColors.primary,
+                          inactiveColor: AppColors.surfaceLight,
+                          onChanged: (v) =>
+                              setState(() => _craftsmanshipComplexity = v),
+                        ),
+                      ),
+                      SizedBox(
+                        width: 42,
+                        child: AppText(
+                          '${(_craftsmanshipComplexity * 100).toInt()}%',
+                          style: const TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.primary),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
             const SizedBox(height: 16),
-            // Calculate button
+            // ── Calculate button ───────────────────────────────────────
             if (!_showCalculation)
               GestureDetector(
                 onTap: _loading ? null : _calculate,
@@ -199,7 +406,7 @@ class _PricingScreenState extends State<PricingScreen> {
               ),
 
             if (_recommendation != null) ...[
-              // Recommendation card
+              // ── Recommendation card ────────────────────────────────
               const SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.all(20),
@@ -325,7 +532,7 @@ class _PricingScreenState extends State<PricingScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-              // Comparable products
+              // ── Comparable products ────────────────────────────────
               GlassCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -376,7 +583,7 @@ class _PricingScreenState extends State<PricingScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-              // Price slider
+              // ── Price slider ───────────────────────────────────────
               GlassCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -436,11 +643,13 @@ class _PricingScreenState extends State<PricingScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              // Approve / Next
+              // ── Approve / Next ─────────────────────────────────────
               GestureDetector(
-                onTap: _approved
-                    ? () => context.push('/b2b', extra: widget.productId)
-                    : () => setState(() => _approved = true),
+                onTap: _approving
+                    ? null
+                    : _approved
+                        ? () => context.push('/b2b', extra: widget.productId)
+                        : _approveFinalPrice,
                 child: Container(
                   height: 56,
                   decoration: BoxDecoration(
@@ -462,14 +671,22 @@ class _PricingScreenState extends State<PricingScreen> {
                     ],
                   ),
                   child: Center(
-                    child: AppText(
-                      _approved ? '✓ कीमत तय! B2B देखें →' : '✅ यह कीमत सही है',
-                      style: const TextStyle(
-                          fontFamily: 'Poppins',
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white),
-                    ),
+                    child: _approving
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                                color: Colors.white, strokeWidth: 2.5))
+                        : AppText(
+                            _approved
+                                ? '✓ कीमत तय! B2B देखें →'
+                                : '✅ यह कीमत सही है',
+                            style: const TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white),
+                          ),
                   ),
                 ),
               ),
@@ -480,7 +697,126 @@ class _PricingScreenState extends State<PricingScreen> {
       ),
     );
   }
+
+  // ── AI Chip widget ─────────────────────────────────────────────────────
+
+  Widget _buildAiChip(BuildContext context) {
+    if (_aiLoading) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.divider),
+        ),
+        child: const Row(
+          children: [
+            SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(
+                  strokeWidth: 2, color: AppColors.accent),
+            ),
+            SizedBox(width: 10),
+            AppText('🤖  Analyzing your product photo…',
+                style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 12,
+                    color: AppColors.textSecondary)),
+          ],
+        ),
+      );
+    }
+
+    final analysis = _aiAnalysis;
+    if (analysis == null) return const SizedBox.shrink();
+
+    final isHindi = context.isHindi;
+    final reasoning = isHindi ? analysis.reasoningHi : analysis.reasoningEn;
+    final pct = (analysis.complexityScore * 100).toInt();
+    final chipColor =
+        analysis.isFallback ? AppColors.textHint : AppColors.accentGreen;
+    final tierEmoji = {
+          'low': '🔵',
+          'medium': '🟡',
+          'premium': '🟢',
+        }[analysis.materialTier] ??
+        '⚪';
+
+    return GestureDetector(
+      onTap: () => setState(() => _aiChipExpanded = !_aiChipExpanded),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: analysis.isFallback
+              ? AppColors.surface
+              : AppColors.accentGreen.withOpacity(0.07),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: chipColor.withOpacity(0.3)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              Text(analysis.isFallback ? '⚙️' : '🤖',
+                  style: const TextStyle(fontSize: 16)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: AppText(
+                  analysis.isFallback
+                      ? 'Adjust craftsmanship manually'
+                      : '🤖  AI assessed: $pct% craftsmanship  $tierEmoji ${analysis.materialTier}',
+                  style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: chipColor),
+                ),
+              ),
+              if (!analysis.isFallback)
+                Icon(
+                  _aiChipExpanded
+                      ? Icons.expand_less_rounded
+                      : Icons.expand_more_rounded,
+                  size: 18,
+                  color: AppColors.textHint,
+                ),
+            ]),
+            // Complexity bar
+            if (!analysis.isFallback) ...[
+              const SizedBox(height: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: analysis.complexityScore,
+                  minHeight: 6,
+                  backgroundColor: AppColors.surfaceLight,
+                  color: AppColors.accentGreen,
+                ),
+              ),
+            ],
+            // Expandable reasoning
+            if (_aiChipExpanded && !analysis.isFallback && reasoning.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 10),
+                child: AppText(
+                  reasoning,
+                  style: const TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
+                      height: 1.5),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
 }
+
+// ── Cost Input Row ─────────────────────────────────────────────────────────
 
 class _CostInputRow extends StatelessWidget {
   final String emoji;

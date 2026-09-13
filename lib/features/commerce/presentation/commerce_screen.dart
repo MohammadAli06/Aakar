@@ -92,14 +92,14 @@ class _CommerceScreenState extends ConsumerState<CommerceScreen> {
   @override
   Widget build(BuildContext context) {
     final store = ref.watch(commerceProvider);
-    // Role comes from the signed-in account and is fixed at signup; the workspace
-    // follows it rather than offering a switch.
-    final accountRole = ref.watch(sessionProvider).role?.name;
-    if (accountRole != null && accountRole != store.role) {
+    // The catalogue and role follow the signed-in account; role is fixed at
+    // signup rather than offered as a switch.
+    final account = ref.watch(sessionProvider).account;
+    if (store.ready && account != null) {
       WidgetsBinding.instance
-          .addPostFrameCallback((_) => store.applyAccountRole(accountRole));
+          .addPostFrameCallback((_) => store.applyAccount(account));
     }
-    final buyer = (accountRole ?? store.role) == 'buyer';
+    final buyer = (account?.role.name ?? store.role) == 'buyer';
     final rootPages = [
       'home',
       'discover',
@@ -505,8 +505,8 @@ class _CommerceScreenState extends ConsumerState<CommerceScreen> {
             onTap: () => go('help'))
       ])),
       Text(
-          t('${repo.modeLabel} · sample catalog illustrations · payments and logistics are simulated.',
-              '${repo.modeLabel} · नमूना चित्र · भुगतान व लॉजिस्टिक्स डेमो हैं।'),
+          t('${repo.modeLabel} · ${repo.signedIn ? 'payments and logistics are simulated.' : 'sample catalog illustrations · payments and logistics are simulated.'}',
+              '${repo.modeLabel} · भुगतान व लॉजिस्टिक्स डेमो हैं।'),
           style: const TextStyle(fontSize: 9, color: Color(0xFF828678)),
           textAlign: TextAlign.center),
     ];
@@ -541,6 +541,8 @@ class _CommerceScreenState extends ConsumerState<CommerceScreen> {
                           style: const TextStyle(fontSize: 10)),
                       const SizedBox(height: 6),
                       Wrap(spacing: 5, runSpacing: 4, children: [
+                        StatusPill(availabilityLabel(p),
+                            warning: p['available'] != true),
                         StatusPill(
                             profile?['verification'] == 'verified'
                                 ? t('✓ Verified', '✓ सत्यापित')
@@ -729,6 +731,10 @@ class _CommerceScreenState extends ConsumerState<CommerceScreen> {
               label: Text(value == 'All' ? label : value,
                   style: const TextStyle(fontSize: 10)),
               avatar: const Icon(Icons.expand_more, size: 15)));
+  String availabilityLabel(Record p) => p['available'] == true
+      ? t('Available Now', 'अभी उपलब्ध')
+      : t('Not Taking Orders', 'अभी ऑर्डर नहीं ले रहे');
+
   List<Widget> product(Record p) {
     final own = repo.role == 'artisan' && p['artisan_id'] == repo.actor;
     final gaps = CommerceEngine.readiness(p);
@@ -736,6 +742,27 @@ class _CommerceScreenState extends ConsumerState<CommerceScreen> {
       Center(child: CraftImage('${p['image']}', size: 245)),
       const SizedBox(height: 18),
       title('${p['title']}', '${p['title']}', supplier(p['artisan_id'])),
+      if (own)
+        CraftCard(
+            child: SwitchListTile.adaptive(
+                key: const ValueKey('product-availability'),
+                contentPadding: EdgeInsets.zero,
+                title: Text(availabilityLabel(p),
+                    style: const TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: Text(t('Accept new inquiries for this product.',
+                    'इस उत्पाद के लिए नई पूछताछ स्वीकार करें।')),
+                value: p['available'] == true,
+                onChanged: repo.busy || !repo.ready
+                    ? null
+                    : (value) => action(
+                        'availability', {'id': p['id'], 'available': value})))
+      else
+        Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Align(
+                alignment: Alignment.centerLeft,
+                child: StatusPill(availabilityLabel(p),
+                    warning: p['available'] != true))),
       CraftCard(
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -781,6 +808,10 @@ class _CommerceScreenState extends ConsumerState<CommerceScreen> {
           CraftButton(t('Edit & re-verify', 'सुधारें और सत्यापित करें'),
               secondary: true,
               onPressed: () => context.push('/workspace/create/${p['id']}')),
+          Text(
+              t('Edit stock, MOQ, monthly capacity and lead time in catalog details.',
+                  'कैटलॉग विवरण में स्टॉक, न्यूनतम मात्रा, मासिक क्षमता और समय बदलें।'),
+              style: const TextStyle(fontSize: 11)),
           CraftButton(
               p['status'] == 'published'
                   ? t('Published', 'प्रकाशित')
@@ -794,7 +825,9 @@ class _CommerceScreenState extends ConsumerState<CommerceScreen> {
             secondary: true, onPressed: () => go('channels', '${p['id']}')),
       ] else if (repo.role == 'buyer') ...[
         CraftButton(t('Send inquiry / RFQ', 'पूछताछ भेजें'),
-            onPressed: () => sendInquiry(p)),
+            onPressed: p['available'] == true && !repo.busy
+                ? () => sendInquiry(p)
+                : null),
         CraftButton(t('Save / unsave supplier', 'आपूर्तिकर्ता सहेजें / हटाएँ'),
             secondary: true,
             onPressed: () => action(
@@ -2162,8 +2195,8 @@ class _CommerceScreenState extends ConsumerState<CommerceScreen> {
   List<Widget> help() => [
         CraftCard(
             child: Text(t(
-                'Demo workspace: sample products and orders, separate from your verified account.',
-                'डेमो कार्यक्षेत्र: नमूना उत्पाद और ऑर्डर आपके सत्यापित खाते से अलग हैं।'))),
+                'Your products are saved to your Aakar account on the shared backend. Orders, payments and shipping in this build are simulated.',
+                'आपके उत्पाद आकार खाते में साझा बैकएंड पर सहेजे जाते हैं। इस बिल्ड में ऑर्डर, भुगतान और शिपिंग डेमो हैं।'))),
         title('A little help, at every step', 'हर कदम पर थोड़ी मदद'),
         ...[
           [

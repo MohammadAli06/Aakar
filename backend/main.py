@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
-from app.routers import admin, auth, products, catalog, pricing, b2b, workspace, account_verification
+from app.routers import admin, auth, products, catalog, pricing, b2b, workspace, account_verification, requirements, studio
 from app.core.config import settings
 from app.core.database import engine, Base
 
@@ -45,6 +45,8 @@ def create_app() -> FastAPI:
     app.include_router(auth.router, prefix="/api/v1/auth", tags=["Auth"])
     app.include_router(account_verification.router, prefix="/api/v1/auth", tags=["Account verification"])
     app.include_router(products.router, prefix="/api/v1/products", tags=["Products"])
+    app.include_router(requirements.router, prefix="/api/v1/requirements", tags=["Requirements"])
+    app.include_router(studio.router, prefix="/api/v1/studio", tags=["Product Studio"])
     app.include_router(catalog.router, prefix="/api/v1/catalog", tags=["Catalog"])
     app.include_router(pricing.router, prefix="/api/v1/pricing", tags=["Pricing"])
     app.include_router(b2b.router, prefix="/api/v1/b2b", tags=["B2B"])

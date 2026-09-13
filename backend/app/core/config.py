@@ -33,6 +33,16 @@ class Settings(BaseSettings):
     LLM_API_KEY: Optional[str] = None
     LLM_API_BASE: str = "https://api.groq.com/openai/v1"
     LLM_MODEL: str = "llama-3.1-70b-versatile"
+    # OpenAI Product Studio (server-side only; independent of text LLM settings).
+    OPENAI_API_KEY: Optional[str] = None
+    OPENAI_IMAGE_MODEL: str = "gpt-image-2.5-sunburst"
+    OPENAI_VISION_MODEL: str = "gpt-4.1-mini"
+    OPENAI_TIMEOUT_SECONDS: float = 180
+    # Legacy entries accepted so existing .env files still load; no Gemini calls.
+    GEMINI_API_KEY: Optional[str] = None
+    GEMINI_IMAGE_MODEL: str = "gemini-3.1-flash-image"
+    GEMINI_VISION_MODEL: str = "gemini-2.5-flash"
+    GEMINI_TIMEOUT_SECONDS: float = 120
 
     # Bhashini ASR
     BHASHINI_API_KEY: Optional[str] = None

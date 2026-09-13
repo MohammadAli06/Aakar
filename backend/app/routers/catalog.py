@@ -5,17 +5,21 @@ can run inline for the demo.
 """
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 
-from app.core.auth_deps import require_artisan_profile
+from app.core.auth_deps import get_current_user, require_artisan_profile
 from app.core.database import get_db
 from app.core.ownership import load_owned_product
+from app.routers.products import load_bundle, serialize_products
 from app.services.asr_service import transcribe_audio
 from app.services.extraction_service import extract_attributes_with_confidence
 from app.services.generation_service import generate_bilingual_listing
-from app.models.models import Artisan, Product, ProductListing, VerificationStatus
+from app.models.models import (
+    Artisan, Product, ProductListing, ProductStatus, User, VerificationStatus,
+)
 
 router = APIRouter()
 
@@ -187,3 +191,21 @@ async def verify_listing(
     await db.commit()
 
     return {"status": listing.verification_status, "listing_id": listing.id}
+
+
+@router.get("/published")
+async def published_products(
+    _user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """The marketplace catalogue: published products only.
+
+    Drafts, and anything an administrator has flagged or blocked, never reach
+    buyers. Any signed-in account may browse.
+    """
+    products = (await db.scalars(select(Product).where(
+        Product.status == ProductStatus.published).order_by(
+        Product.created_at.desc()))).all()
+    bundle = await load_bundle(db, list(products))
+    rows = serialize_products(list(products), bundle)
+    return [row for row in rows if row["moderation"] not in ("flagged", "blocked")]

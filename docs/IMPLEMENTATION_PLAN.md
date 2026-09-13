@@ -33,6 +33,16 @@ Accept when the same phone can switch roles without losing language/session/busi
 
 ## 2. Finish product creation and separate publication
 
+- [x] Replace the active photo pipeline with authenticated OpenAI white-background editing, deterministic natural exposure and optional-cleanup B2B framing (2026-09-14). Add original-image catalog suggestions with field/evidence filtering, correction, unchanged artisan values and explicit image review. Persist photo metadata through the real product API. [Configuration and boundaries](OPENAI_PRODUCT_STUDIO.md). This supersedes the local-only photo path recorded below.
+- [x] Migrate Studio to OpenAI image edits and Responses-based catalog extraction; separate API-credit and rate-limit errors, preserve legacy Gemini photo review and original/manual fallbacks. ChatGPT subscription billing is separate.
+- [ ] Validate the OpenAI key/model access and actual output quality on artisan photos, including pale products, handles/fringes, heavy shadow and textured tables. Mocked responses and synthetic tests do not establish live accuracy.
+
+- [x] Add an owner-only product availability switch with buyer-facing status, persisted boolean-only workflow updates, backend ownership checks and new-inquiry gating. Keep catalog approval/publication unchanged and capacity fields in the existing Edit & re-verify flow. Validate role/restart persistence and English/Hindi phone controls; defer live tenant-scoped commerce.
+
+- [x] Show the B2B background switch only when B2B catalogue frame is selected.
+
+- [x] Harden deterministic photo preparation (2026-09-13): 18px border seeds, protected central 70%, enclosed-island cleanup below 2%, and 3px outward feather. Natural mode skips masking; B2B fits retained bounds into 1200×1200 with 10% minimum margins and an optional whole-natural-photo setting. Full-image previews and original retention support review. Synthetic pixel regression tests pass; real textured-photo/device acceptance remains pending.
+
 - [x] Remove the four trailing Review Catalog toggles (availability, customization, fragility, safe packaging) at user request. Preserve stored values and existing readiness checks; removing controls does not confirm capabilities.
 
 - [x] Wire guided capture/enhancement with original preservation and review; label any simulated processing. The studio now offers three real, deterministic preparations — plain background, exposure correction and a fixed 1200×1200 catalogue frame — each with before/after comparison, undo, and the choice stored on the product record. Back navigation moves between studio steps instead of leaving the wizard.

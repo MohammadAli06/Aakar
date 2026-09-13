@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/commerce_repository.dart';
 import '../../../core/localization/app_strings.dart';
+import '../../../core/services/api_client.dart';
 import '../../../core/theme/app_colors.dart';
 
 String bilingual(BuildContext context, String en, String hi) =>
@@ -138,29 +139,37 @@ class CraftHeading extends StatelessWidget {
 class CraftImage extends ConsumerWidget {
   final String source;
   final double size;
-  const CraftImage(this.source, {super.key, this.size = 80});
+  final BoxFit fit;
+  const CraftImage(this.source,
+      {super.key, this.size = 80, this.fit = BoxFit.cover});
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final repo = ref.watch(commerceProvider);
     final fallback =
         CustomPaint(painter: _CraftPainter(source), size: Size.square(size));
+    // Stored media is addressed relative to the API (`/api/...`), so it resolves
+    // against the base URL this build is actually talking to — never against the
+    // host that happened to reach the server.
+    final remote = source.startsWith('http') || source.startsWith('/api/');
+    final localFile = !source.startsWith('/api/') &&
+        (source.startsWith('/') || source.contains(':\\'));
     return ClipRRect(
         borderRadius: BorderRadius.circular(12),
         child: SizedBox(
             width: size,
             height: size,
-            child: source.startsWith('/') || source.contains(':\\')
-                ? Image.file(File(source),
-                    fit: BoxFit.cover, errorBuilder: (_, __, ___) => fallback)
-                : source.startsWith('http')
-                    ? Image.network(source,
-                        headers: repo.connected &&
-                                source.startsWith(
-                                    '${repo.endpoint}/api/v1/workspace/media/')
-                            ? {'Authorization': 'Bearer ${repo.token}'}
-                            : null,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => fallback)
+            child: remote
+                ? Image.network(ApiClient.mediaUrl(source),
+                    headers: repo.connected &&
+                            source.startsWith(
+                                '${repo.endpoint}/api/v1/workspace/media/')
+                        ? {'Authorization': 'Bearer ${repo.token}'}
+                        : null,
+                    fit: fit,
+                    errorBuilder: (_, __, ___) => fallback)
+                : localFile
+                    ? Image.file(File(source),
+                        fit: fit, errorBuilder: (_, __, ___) => fallback)
                     : fallback));
   }
 }

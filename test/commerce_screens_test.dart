@@ -5,6 +5,8 @@ import 'package:craft_connect/app.dart';
 import 'package:craft_connect/core/routing/app_router.dart';
 import 'package:craft_connect/core/services/app_providers.dart';
 import 'package:craft_connect/features/commerce/domain/commerce_engine.dart';
+import 'package:craft_connect/features/commerce/data/commerce_repository.dart';
+import 'package:craft_connect/features/commerce/presentation/craft_widgets.dart';
 import 'package:craft_connect/shared/models/account.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -94,6 +96,70 @@ void main() {
   }
 
   for (final language in ['en', 'hi']) {
+    for (final artisan in [true, false]) {
+      testWidgets(
+          'Product availability control respects role in $language ($artisan)',
+          (tester) async {
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final state = CommerceEngine.seed();
+        (state['products'] as List).first['available'] = artisan;
+        SharedPreferences.setMockInitialValues({
+          'commerce_state_v1': jsonEncode(state),
+          'commerce_role': artisan ? 'artisan' : 'buyer',
+        });
+        final container = ProviderContainer(overrides: [
+          selectedLanguageProvider.overrideWith((ref) => language),
+          sessionProvider.overrideWith((ref) => signedInSession(
+              artisan ? AccountRole.artisan : AccountRole.buyer)),
+        ]);
+        final router = container.read(appRouterProvider);
+        router.go('/workspace/product/basket');
+        addTearDown(router.dispose);
+        addTearDown(container.dispose);
+        await tester.pumpWidget(UncontrolledProviderScope(
+            container: container, child: const AakarApp()));
+        await tester.pumpAndSettle();
+        final toggle = find.byKey(const ValueKey('product-availability'));
+        if (artisan) {
+          expect(toggle, findsOneWidget);
+          await tester.ensureVisible(toggle);
+          await tester.tap(toggle);
+          await tester.pumpAndSettle();
+          final p =
+              container.read(commerceProvider).lookup('products', 'basket')!;
+          expect(p['available'], false);
+          expect(p['status'], 'published');
+          expect(p['approved'], true);
+          await tester.tap(toggle);
+          await tester.pumpAndSettle();
+          expect(
+              container
+                  .read(commerceProvider)
+                  .lookup('products', 'basket')!['available'],
+              true);
+        } else {
+          expect(toggle, findsNothing);
+          expect(
+              container
+                  .read(commerceProvider)
+                  .lookup('products', 'basket')!['available'],
+              false);
+          expect(
+              find.text(language == 'en'
+                  ? 'Not Taking Orders'
+                  : 'अभी ऑर्डर नहीं ले रहे'),
+              findsOneWidget);
+          final inquiry = find.widgetWithText(CraftButton,
+              language == 'en' ? 'Send inquiry / RFQ' : 'पूछताछ भेजें');
+          await tester.scrollUntilVisible(inquiry, 400);
+          expect(tester.widget<CraftButton>(inquiry).onPressed, isNull);
+        }
+        expect(tester.takeException(), isNull);
+      });
+    }
     for (final page in [
       'home',
       'discover',
@@ -123,8 +189,8 @@ void main() {
           selectedLanguageProvider.overrideWith((ref) => language),
           // The workspace is behind the auth guard now, so run as a signed-in
           // buyer account (role is fixed at signup).
-          sessionProvider.overrideWith(
-              (ref) => signedInSession(AccountRole.buyer)),
+          sessionProvider
+              .overrideWith((ref) => signedInSession(AccountRole.buyer)),
         ]);
         final router = container.read(appRouterProvider);
         router.go('/workspace/$page');

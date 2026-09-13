@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'dart:typed_data';
 
 import 'auth_service.dart';
 
@@ -51,6 +52,21 @@ class ApiClient {
     }
   }
 
+  /// Absolute URL for a stored media path.
+  ///
+  /// The backend answers with a path relative to the API (`/api/v1/...`) rather
+  /// than an absolute URL, because the host it is reached through — a dev tunnel
+  /// or a proxy — is not the host a client should later use. Resolve it against
+  /// the base URL this build is already talking to.
+  static String mediaUrl(String value) {
+    if (!value.startsWith('/')) return value;
+    try {
+      return Uri.parse(baseUrl).origin + value;
+    } catch (_) {
+      return value;
+    }
+  }
+
   Future<dynamic> get(String path,
       {Map<String, dynamic>? queryParameters}) async {
     try {
@@ -93,16 +109,30 @@ class ApiClient {
   }
 
   Future<dynamic> uploadFile(String path, String filePath,
-      {Map<String, dynamic>? fields}) async {
+      {Map<String, dynamic>? fields, Duration? receiveTimeout}) async {
     try {
       final form = FormData.fromMap({
         'file': await MultipartFile.fromFile(filePath),
         ...?fields,
       });
-      final response = await _dio.post(path, data: form);
+      final response = await _dio.post(path,
+          data: form,
+          options: Options(
+              contentType: 'multipart/form-data',
+              receiveTimeout: receiveTimeout));
       return response.data;
     } on DioException catch (e) {
       throw ApiError(e.response?.statusCode ?? 0, e.message, e.response?.data);
+    }
+  }
+
+  Future<Uint8List> getBytes(String path) async {
+    try {
+      final response = await _dio.get<List<int>>(path,
+          options: Options(responseType: ResponseType.bytes));
+      return Uint8List.fromList(response.data ?? []);
+    } on DioException catch (e) {
+      throw ApiError(e.response?.statusCode ?? 0, e.message, null);
     }
   }
 }

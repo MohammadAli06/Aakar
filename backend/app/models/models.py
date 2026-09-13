@@ -111,7 +111,7 @@ class Buyer(Base):
     user = relationship("User", back_populates="buyer_profile")
 
 
-# ── Product ───────────────────────────────────────────────────────────────
+# ── Account verification ──────────────────────────────────────────────────
 class AccountVerification(Base):
     __tablename__ = "account_verifications"
     __table_args__ = (UniqueConstraint('user_id', 'role'),)
@@ -124,6 +124,32 @@ class AccountVerification(Base):
     consent_at = Column(DateTime, nullable=True)
     submitted_at = Column(DateTime, nullable=True)
     review_note = Column(Text, nullable=True)
+
+
+# ── Buyer requirement ─────────────────────────────────────────────────────
+# An open statement of demand posted from the marketplace. It is owned by the
+# buying account, is not an order, and commits nobody to anything.
+class Requirement(Base):
+    __tablename__ = "requirements"
+
+    id = Column(String, primary_key=True, default=_uuid)
+    buyer_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    product = Column(Text, nullable=False)              # what the buyer needs
+    original = Column(Text, nullable=True)              # the buyer's own words, kept verbatim
+    quantity = Column(Float, nullable=False)
+    budget = Column(Float, default=0.0)                 # per unit; 0 means "discuss"
+    lead_days = Column(Float, nullable=False)
+    location = Column(String(300), nullable=False)
+    target_date = Column(String(40), nullable=True)
+    customization = Column(Text, nullable=True)
+    specifications = Column(Text, nullable=True)
+    packaging = Column(String(300), nullable=True)
+    reference_image = Column(String(500), nullable=True)
+    sample_required = Column(Boolean, default=False)
+    status = Column(String(30), nullable=False, default="open")   # open | closed
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
 
 
 class Product(Base):

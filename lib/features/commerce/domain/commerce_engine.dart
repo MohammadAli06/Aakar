@@ -236,6 +236,10 @@ class CommerceEngine {
       if (p[key] is! bool) missing.add(key);
     }
     if (p['approved'] != true) missing.add('artisan approval');
+    if (const ['gemini', 'openai'].contains(p['photo_provider']) &&
+        p['photo_reviewed'] != true) {
+      missing.add('photo review');
+    }
     if (number(p['price']) < floor(p)) missing.add('price below cost floor');
     return missing;
   }
@@ -515,6 +519,14 @@ class CommerceEngine {
                 : 'draft';
         if (!exists) list('products').add(p);
         break;
+      case 'availability':
+        asRole('artisan');
+        final p = find('products', input['id']);
+        owner(p);
+        require(input['available'] is bool, 'Choose an availability status');
+        // Operational availability does not change catalog approval/publication.
+        p['available'] = input['available'];
+        break;
       case 'publish':
         asRole('artisan');
         final p = find('products', input['id']);
@@ -560,6 +572,7 @@ class CommerceEngine {
         asRole('buyer');
         final p = find('products', input['product_id']);
         require(p['status'] == 'published', 'Product is not published');
+        require(p['available'] == true, 'This product is not taking orders');
         require(number(input['quantity']) >= number(p['moq']),
             'Requested quantity is below MOQ');
         require(

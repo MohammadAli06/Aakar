@@ -17,8 +17,9 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.models.models import (
     AccountVerification, AdminAuditLog, Artisan, Buyer, PriceRecommendation,
-    Product, ProductListing, ProductModeration, User,
+    Product, ProductListing, ProductModeration, Requirement, User,
 )
+from app.routers.requirements import requirement_record
 
 router = APIRouter()
 
@@ -110,10 +111,16 @@ async def overview(_admin: None = Depends(require_admin), db: AsyncSession = Dep
         by_status[product.status.value] = by_status.get(product.status.value, 0) + 1
     flagged = sum(1 for row in moderations if row.status in ("flagged", "blocked"))
 
+    requirements = (await db.scalars(select(Requirement))).all()
+
     return {
         "accounts": accounts,
         "verifications": statuses,
         "products": {"total": len(products), "flagged": flagged, "by_status": by_status},
+        "requirements": {
+            "total": len(requirements),
+            "open": sum(1 for row in requirements if row.status == "open"),
+        },
         "generated_at": datetime.utcnow().isoformat(),
     }
 
@@ -218,10 +225,11 @@ async def list_products(
         owner = users.get(artisan.user_id) if artisan else None
         moderation_row = moderations.get(product.id)
         moderation_state = moderation_row.status if moderation_row else "clear"
+        attributes = (listing.attributes if listing else None) or {}
         row = {
             "id": product.id,
             "title": (listing.title_en if listing else None) or f"{product.category.value} product",
-            "category": product.category.value,
+            "category": attributes.get("ui_category") or product.category.value,
             "status": product.status.value,
             "created_at": _iso(product.created_at),
             "artisan_id": product.artisan_id,
@@ -353,6 +361,41 @@ async def activity(
         })
     events.sort(key=lambda item: item["at"] or "", reverse=True)
     return events[:limit]
+
+
+@router.get("/requirements")
+async def list_requirements(
+    status: Optional[str] = Query(default=None, pattern="^(open|closed)$"),
+    q: Optional[str] = None,
+    _admin: None = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Buyer-posted demand, newest first. Read-only: no decision is recorded here.
+
+    A requirement is a statement of what a buyer needs, not an order. The console
+    shows it so reviewers can see real demand alongside the catalogue.
+    """
+    requirements = (await db.scalars(select(Requirement).order_by(
+        desc(Requirement.created_at)))).all()
+    users, _verifications, _artisans, buyers = await _directory(db)
+    owners = {user.id: user for user in users}
+    rows = []
+    for requirement in requirements:
+        owner = owners.get(requirement.buyer_id)
+        profile = buyers.get(requirement.buyer_id)
+        if status and requirement.status != status:
+            continue
+        if not _matches(q or "", requirement.product, requirement.original,
+                        requirement.location, owner.name if owner else None,
+                        owner.phone if owner else None,
+                        profile.business_name if profile else None):
+            continue
+        item = requirement_record(requirement, owner,
+                                  profile.business_name if profile else None)
+        item["buyer_phone"] = owner.phone if owner else None
+        item["created_at"] = _iso(requirement.created_at)
+        rows.append(item)
+    return rows
 
 
 @router.get("/platform")

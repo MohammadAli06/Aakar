@@ -12,6 +12,7 @@ import { Accounts } from './pages/Accounts.jsx'
 import { AccountDetail } from './pages/AccountDetail.jsx'
 import { Products } from './pages/Products.jsx'
 import { ProductDetail } from './pages/ProductDetail.jsx'
+import { Requirements } from './pages/Requirements.jsx'
 import { Issues } from './pages/Issues.jsx'
 import { Analytics } from './pages/Analytics.jsx'
 import { Activity } from './pages/Activity.jsx'
@@ -23,6 +24,7 @@ const SECTIONS = new Set([
   'verification',
   'accounts',
   'products',
+  'requirements',
   'issues',
   'analytics',
   'activity',
@@ -58,6 +60,9 @@ function Console({ section, id, reloadKey, counts, onRefresh, onSignOut, refresh
       break
     case 'products':
       page = id ? <ProductDetail productId={id} reloadKey={reloadKey} /> : <Products reloadKey={reloadKey} />
+      break
+    case 'requirements':
+      page = <Requirements reloadKey={reloadKey} />
       break
     case 'issues':
       page = <Issues reloadKey={reloadKey} />

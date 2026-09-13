@@ -41,6 +41,7 @@ export function Dashboard({ reloadKey }) {
           const accounts = overview.accounts
           const verifications = overview.verifications
           const products = overview.products
+          const requirements = overview.requirements || { total: 0, open: 0 }
           const verificationTotal =
             verifications.pending +
             verifications.verified +
@@ -223,6 +224,30 @@ export function Dashboard({ reloadKey }) {
                       text="Reviewer decisions and verification submissions will appear here."
                     />
                   )}
+                </Card>
+
+                <Card
+                  title="Buyer demand"
+                  sub="Requirements posted from the marketplace"
+                  actions={
+                    <Button variant="ghost" size="sm" onClick={() => navigate('/requirements')}>
+                      Open list <Icon name="chevron" size={13} />
+                    </Button>
+                  }
+                >
+                  <div className="stack" style={{ gap: 12 }}>
+                    <StatCard
+                      icon="search"
+                      tone="blue"
+                      label="Open requirements"
+                      value={requirements.open}
+                      foot={`${requirements.total} posted in total`}
+                    />
+                    <div className="muted" style={{ fontSize: 12 }}>
+                      A requirement records what a buyer needs. It is not an order, it creates no
+                      commitment, and it is not an action the console has to take.
+                    </div>
+                  </div>
                 </Card>
               </div>
 

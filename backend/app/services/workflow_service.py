@@ -107,6 +107,11 @@ def apply(original, action, data, role, actor):
         p['status'] = 'needs_update' if p['status'] == 'published' else 'draft' if readiness(p) else 'ready'
         if not data.get('id'):
             state['products'].append(p)
+    elif action == 'availability':
+        as_role('artisan')
+        p = owned(find('products', data.get('id')))
+        need(isinstance(data.get('available'), bool), 'Choose an availability status')
+        p['available'] = data['available']
     elif action == 'publish':
         as_role('artisan')
         p = owned(find('products', data.get('id')))
@@ -126,6 +131,7 @@ def apply(original, action, data, role, actor):
         as_role('buyer')
         p = find('products', data.get('product_id'))
         need(p['status'] == 'published', 'Product is not published')
+        need(p.get('available') is True, 'This product is not taking orders')
         need(num(data.get('quantity')) >= num(p['moq']) and num(data.get('lead_days')) > 0 and data.get('location'), 'Quantity must meet MOQ; deadline and location required')
         r = {**data, 'id': ident('rfq'), 'buyer_id': actor, 'artisan_id': p['artisan_id'], 'product_title': p['title'], 'status': 'sent', 'capacity_status': 'pending', 'sample_status': 'requested' if data.get('sample_required') else 'not_required', 'messages': [], 'quotes': [], 'events': [], 'time': now}
         event(r, 'Inquiry sent')

@@ -13,6 +13,7 @@ const NAV = [
       { key: 'verification', text: 'Verification', icon: 'shield', badge: 'pending' },
       { key: 'accounts', text: 'Accounts', icon: 'users' },
       { key: 'products', text: 'Products', icon: 'package', badge: 'flagged' },
+      { key: 'requirements', text: 'Requirements', icon: 'search' },
       { key: 'issues', text: 'Order issues', icon: 'alert', badge: 'issues' },
     ],
   },
