@@ -7,9 +7,9 @@ import 'package:path_provider/path_provider.dart';
 
 /// How a product photo is prepared before it is attached to a listing.
 ///
-/// Product Studio uses StudioService for OpenAI white-background editing and
+/// Product Studio uses StudioService for provider-selected background removal and
 /// deterministic exposure/framing. The local transforms below remain legacy
-/// utilities, not a silent fallback for a failed OpenAI request.
+/// utilities, not a silent fallback for a failed provider request.
 enum PhotoPrep { plainBackground, naturalSetting, b2bCatalog }
 
 class PhotoPrepOption {
@@ -27,8 +27,8 @@ const photoPrepOptions = <PhotoPrepOption>[
     PhotoPrep.plainBackground,
     'Plain white background',
     'सादा सफ़ेद बैकग्राउंड',
-    'OpenAI replaces the surroundings with white, with instructions to preserve the whole object and its real details. Review the result against your original.',
-    'OpenAI को पूरा उत्पाद और असली विवरण सुरक्षित रखकर आसपास सफ़ेद करने का निर्देश मिलता है। परिणाम मूल फ़ोटो से मिलाकर जाँचें।',
+    'Remove the surroundings while keeping the product. A transparent cutout or white background is shown depending on the preparation service. Compare it with your original.',
+    'उत्पाद को रखकर आसपास का बैकग्राउंड हटाएँ। तैयारी सेवा के अनुसार पारदर्शी या सफ़ेद बैकग्राउंड मिलेगा। मूल फ़ोटो से मिलाकर जाँचें।',
   ),
   PhotoPrepOption(
     PhotoPrep.naturalSetting,

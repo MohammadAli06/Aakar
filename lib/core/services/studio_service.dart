@@ -16,10 +16,15 @@ class PreparedStudioPhoto {
       this.path, this.originalPath, this.provider, this.reviewRequired);
 }
 
-/// Only this authenticated backend client handles OpenAI. No key in the app.
+/// Provider selection and credentials stay on the authenticated backend.
 class StudioService {
   final ApiClient _api;
-  StudioService({ApiClient? api}) : _api = api ?? apiClient;
+  final Future<Directory> Function() _documentsDirectory;
+  StudioService(
+      {ApiClient? api, Future<Directory> Function()? documentsDirectory})
+      : _api = api ?? apiClient,
+        _documentsDirectory =
+            documentsDirectory ?? getApplicationDocumentsDirectory;
 
   static bool isPhoto(String source) =>
       source.startsWith('/') ||
@@ -27,6 +32,7 @@ class StudioService {
       source.startsWith('http');
 
   Future<String> _localOriginal(String source) async {
+    if (source.startsWith('/api/')) source = ApiClient.mediaUrl(source);
     if (!source.startsWith('http')) return source;
     final uri = Uri.parse(source), backend = Uri.parse(ApiClient.baseUrl);
     final mediaPrefix = '${backend.path}/products/images/';
@@ -39,7 +45,7 @@ class StudioService {
           'Choose this photo again from your gallery to prepare it.', null);
     }
     final bytes = await _api.getBytes(uri.path.substring(backend.path.length));
-    final directory = await getApplicationDocumentsDirectory();
+    final directory = await _documentsDirectory();
     final path =
         '${directory.path}/studio-original-${DateTime.now().microsecondsSinceEpoch}.jpg';
     await File(path).writeAsBytes(bytes);
@@ -57,12 +63,14 @@ class StudioService {
         },
         receiveTimeout: const Duration(seconds: 210)) as Map);
     final bytes = base64Decode(data['image_base64'] as String);
-    if (bytes.isEmpty || data['mime_type'] != 'image/jpeg') {
+    final extension = data['mime_type'] == 'image/png' ? 'png' : 'jpg';
+    if (bytes.isEmpty ||
+        !['image/jpeg', 'image/png'].contains(data['mime_type'])) {
       throw ApiError(502, 'The backend returned no usable photo.', null);
     }
-    final directory = await getApplicationDocumentsDirectory();
+    final directory = await _documentsDirectory();
     final path =
-        '${directory.path}/studio-${mode.name}-${DateTime.now().microsecondsSinceEpoch}.jpg';
+        '${directory.path}/studio-${mode.name}-${DateTime.now().microsecondsSinceEpoch}.$extension';
     await File(path).writeAsBytes(bytes);
     return PreparedStudioPhoto(
         path, original, '${data['provider']}', data['review_required'] == true);
@@ -76,6 +84,19 @@ class StudioService {
         fields: {'notes': notes, 'language': language},
         receiveTimeout: const Duration(seconds: 210)) as Map);
   }
+
+  /// Advisory back-translation check shown on the Listen & Verify step.
+  /// The backend never fails this call; an unavailable check reports
+  /// `is_fallback: true` instead of a passing score.
+  Future<Map<String, dynamic>> checkTranslation(
+          String description, String descriptionHi,
+          {String sourceLang = 'hi'}) async =>
+      Map<String, dynamic>.from(
+          await _api.post('/studio/translation-check', data: {
+        'description': description,
+        'description_hi': descriptionHi,
+        'source_lang': sourceLang
+      }) as Map);
 }
 
 /// Existing artisan values, including deliberately cleared reviewed fields,

@@ -41,6 +41,8 @@ def readiness(p):
     gaps += [k for k in ('available', 'customizable') if not isinstance(p.get(k), bool)]
     if p.get('approved') is not True:
         gaps.append('artisan approval')
+    if p.get('photo_provider') in ('openai', 'gemini', 'cloudinary') and p.get('photo_reviewed') is not True:
+        gaps.append('photo review')
     if num(p.get('price')) < cost_floor(p):
         gaps.append('price below cost floor')
     return gaps
@@ -100,7 +102,7 @@ def apply(original, action, data, role, actor):
     elif action == 'product':
         as_role('artisan')
         p = owned(find('products', data['id'])) if data.get('id') else dict(id=ident('product'), artisan_id=actor, status='draft', external={})
-        for k in ('title', 'title_hi', 'description_hi', 'description', 'category', 'craft', 'material', 'colour', 'dimensions', 'usage', 'story', 'price', 'material_cost', 'labour_cost', 'labour_hours', 'hourly_rate', 'complexity', 'overhead', 'moq', 'stock', 'capacity', 'lead_days', 'available', 'customizable', 'location', 'image', 'original_image', 'prepared', 'fragile', 'can_pack', 'transcript', 'approved'):
+        for k in ('title', 'title_hi', 'description_hi', 'description', 'category', 'craft', 'material', 'colour', 'dimensions', 'usage', 'story', 'price', 'material_cost', 'labour_cost', 'labour_hours', 'hourly_rate', 'complexity', 'overhead', 'moq', 'stock', 'capacity', 'lead_days', 'available', 'customizable', 'location', 'image', 'original_image', 'prepared', 'fragile', 'can_pack', 'transcript', 'approved', 'roundtrip_score', 'translation_confidence'):
             if k in data:
                 p[k] = data[k]
         need(all(num(p.get(k)) >= 0 for k in ('price', 'material_cost', 'labour_cost', 'overhead', 'stock', 'capacity')), 'Costs and capacity cannot be negative')
@@ -320,9 +322,22 @@ def apply(original, action, data, role, actor):
             p['status'] = 'needs_update'
     elif action == 'save_supplier':
         as_role('buyer')
-        find('profiles', data.get('artisan_id'))
+        need(find('profiles', data.get('artisan_id')).get('role') == 'artisan', 'Choose an artisan supplier')
         key = f'{actor}:{data["artisan_id"]}'
         state['saved'].remove(key) if key in state['saved'] else state['saved'].append(key)
+    elif action == 'review_order':
+        as_role('buyer')
+        o = order()
+        need(o['status'] == 'completed', 'Complete delivery and inspection before reviewing')
+        rating = num(data.get('rating'))
+        text = str(data.get('text', '')).strip()
+        tags = data.get('tags', [])
+        need(1 <= rating <= 5 and rating == int(rating), 'Choose 1 to 5 stars')
+        need(len(text) <= 500, 'Review must be 500 characters or fewer')
+        allowed = {'Product quality', 'Communication', 'Timely delivery', 'Packaging', 'Professionalism', 'Value for money'}
+        need(isinstance(tags, list) and all(isinstance(t, str) and t in allowed for t in tags), 'Unknown review tag')
+        o['review'] = {'rating': int(rating), 'text': text, 'tags': list(dict.fromkeys(tags)), 'buyer_id': actor, 'time': now}
+        notify('Buyer review received', o['artisan_id'], 'artisan', 'order/' + o['id'])
     elif action == 'representation':
         o = order()
         need(data.get('purpose') and data.get('location') and data.get('date'), 'Purpose, location and date required')

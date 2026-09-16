@@ -39,6 +39,28 @@ def catalog_response(text):
 
 
 class StudioServiceTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        profile = patch.object(settings, 'AI_PROVIDER_PROFILE', 'openai')
+        profile.start()
+        self.addCleanup(profile.stop)
+    def test_artisan_quote_wrappers_keep_grounded_fields_only(self):
+        notes = 'This is a woven bamboo storage basket.'
+        suggestions = [
+            {'field': 'title', 'value': 'Bamboo storage basket',
+             'evidence': "artisan notes: 'This is a woven bamboo storage basket.'",
+             'confidence': 'high', 'source': 'artisan'},
+            {'field': 'material', 'value': 'Bamboo',
+             'evidence': 'Notes: “woven bamboo storage basket”',
+             'confidence': 'high', 'source': 'artisan'},
+            {'field': 'usage', 'value': 'Food safe storage',
+             'evidence': "artisan notes: 'food safe'",
+             'confidence': 'high', 'source': 'artisan'},
+        ]
+        result = service.filter_catalog({'suggestions': suggestions, 'questions': []}, notes)
+        self.assertEqual(result['fields'], {'title': 'Bamboo storage basket', 'material': 'Bamboo'})
+        self.assertEqual(result['evidence']['material']['reason'], 'woven bamboo storage basket')
+        self.assertEqual(service.artisan_evidence('made of cotton', notes), '')
+
     async def test_distinct_modes_and_fixed_catalog_canvas(self):
         original = photo()
         with patch.object(service, 'edit_photo', AsyncMock(return_value=service.decode_photo(photo(colour='white')))) as openai:
@@ -200,6 +222,9 @@ class StudioServiceTests(unittest.IsolatedAsyncioTestCase):
 
 class StudioApiTests(unittest.TestCase):
     def setUp(self):
+        profile = patch.object(settings, 'AI_PROVIDER_PROFILE', 'openai')
+        profile.start()
+        self.addCleanup(profile.stop)
         app = FastAPI()
         app.include_router(studio.router, prefix='/api/v1/studio')
         async def identity(authorization: str = Header(default='')):

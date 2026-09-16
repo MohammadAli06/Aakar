@@ -24,7 +24,8 @@ final commerceProvider =
 /// payments, shipping) still run on the local demo engine and are labelled as
 /// such in the UI; they are the next thing to move.
 class CommerceRepository extends ChangeNotifier {
-  CommerceRepository({ProductService? catalogue, RequirementService? requirements})
+  CommerceRepository(
+      {ProductService? catalogue, RequirementService? requirements})
       : _catalogue = catalogue ?? ProductService(),
         _requirements = requirements ?? RequirementService() {
     load();
@@ -47,8 +48,7 @@ class CommerceRepository extends ChangeNotifier {
       connectTimeout: const Duration(seconds: 8),
       receiveTimeout: const Duration(seconds: 20)));
 
-  String get actor =>
-      role == 'buyer' ? (_accountId ?? 'buyer') : artisanId;
+  String get actor => role == 'buyer' ? (_accountId ?? 'buyer') : artisanId;
   bool get signedIn => _accountId != null;
   bool get connected => endpoint.isNotEmpty;
   String get modeLabel => signedIn
@@ -77,6 +77,42 @@ class CommerceRepository extends ChangeNotifier {
           ? r['artisan_id'] == actor
           : r['status'] == 'published')
       .toList();
+
+  /// Bring a persisted bidding handoff into the existing quotation workspace.
+  /// Never overwrite a quote already edited on this device or auto-accept it.
+  Future<void> importBiddingInquiry(Record inquiry, Record product) async {
+    if (!signedIn ||
+        ![inquiry['artisan_id'], inquiry['buyer_id']].contains(actor)) {
+      throw WorkflowError('Only a participant can open this quotation');
+    }
+    if (connected) {
+      throw WorkflowError(
+          'Disconnect the separate demo workspace before opening an account quotation');
+    }
+    for (final entry in {'products': product, 'inquiries': inquiry}.entries) {
+      final rows = table(entry.key);
+      if (!rows.any((row) => row['id'] == entry.value['id']))
+        rows.add(copyRecord(entry.value));
+      state[entry.key] = rows;
+    }
+    final profiles = table('profiles');
+    for (final entry in {
+      inquiry['buyer_id']: inquiry['buyer_name'],
+      inquiry['artisan_id']: 'Artisan'
+    }.entries) {
+      if (!profiles.any((p) => p['id'] == entry.key)) {
+        profiles.add({
+          'id': entry.key,
+          'name': entry.value,
+          'verification': 'not_submitted'
+        });
+      }
+    }
+    state['profiles'] = profiles;
+    await _persist();
+    notifyListeners();
+  }
+
   Future<void> load() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -150,7 +186,8 @@ class CommerceRepository extends ChangeNotifier {
       'id': id,
       'role': account.role.name,
       'name': '${existing?['name'] ?? account.displayName}',
-      'location': location.isEmpty ? '${existing?['location'] ?? ''}' : location,
+      'location':
+          location.isEmpty ? '${existing?['location'] ?? ''}' : location,
       'craft': '${existing?['craft'] ?? account.craftCategory ?? ''}',
       'experience': existing?['experience'] ?? 0,
       'story': '${existing?['story'] ?? ''}',

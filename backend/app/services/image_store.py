@@ -26,7 +26,10 @@ def store_photo(data: bytes, folder: Path, label: str = 'photo') -> str:
             if image.width * image.height > MAX_PIXELS:
                 raise HTTPException(status_code=413, detail='Image dimensions are too large')
             image.load()
-            image = image.convert('RGB')
+            rgba = image.convert('RGBA')
+            white = Image.new('RGBA', rgba.size, 'white')
+            white.alpha_composite(rgba)
+            image = white.convert('RGB')
             image.thumbnail((MAX_EDGE, MAX_EDGE))
             folder.mkdir(parents=True, exist_ok=True)
             name = uuid.uuid4().hex + '.jpg'

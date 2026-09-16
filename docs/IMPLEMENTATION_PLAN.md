@@ -1,5 +1,30 @@
 # Implementation plan and demo checklist
 
+## Buyer reference UI ? 2026-09-17
+
+- [x] Map the supplied buyer flow against active screens; preserve working phone-OTP signup.
+- [x] Persist optional business work email/website and show them in business profile.
+- [x] Correct buyer-scoped activity counts, product price filtering and artisan craft/region filtering.
+- [x] Add supplier Overview / Products / Past Orders and a useful saved directory.
+- [x] Add completion actions, validated reviews, and fresh-RFQ repeat purchase with current catalogue values.
+- [x] Categorize activity and link bidding updates to their session; add honest government-marketplace future page.
+- [ ] Real-device acceptance and production synchronization of downstream RFQs, reviews, saved suppliers and orders.
+- [ ] Live escrow/carrier/Google-password-auth integrations and automatic requirement image parsing remain outside this UI pass.
+
+See [buyer screen-by-screen coverage](BUYER_FLOW.md).
+
+## Bidding reference flow override ? 2026-09-17
+
+- [x] Replace hardcoded bidding cards with account-owned persisted sessions and actual home counts.
+- [x] Product selection, preview, quantity/price/date, verified requirement matching, confirmation.
+- [x] Scheduled edits/cancellation, server-enforced live/closed phases, sealed buyer offers.
+- [x] Compare, single/split/reject decisions, quantity checks and pre-quotation buyer withdrawal.
+- [x] Persist selected-offer handoffs and open existing quotation UI without auto-accepting orders.
+- [ ] Device acceptance with distinct verified artisan/buyer accounts; no live bid was placed during automated tests.
+- [ ] Synchronize downstream quotations/orders and inventory settlement across real accounts; the current B2B engine remains demo behavior.
+
+See [all 14 reference steps and boundaries](BIDDING_FLOW.md).
+
 ## Production onboarding slice — 2026-09-12
 
 - [x] Restore main home and workspace navigation after login / verification (2026-09-13). Keep the commerce demo boundary in Profile → Help & scope, without a top banner, and retain real account details at `/account`; refreshing verification also refreshes the account badge. Tenant-scoped commerce remains pending.
@@ -33,13 +58,40 @@ Accept when the same phone can switch roles without losing language/session/busi
 
 ## 2. Finish product creation and separate publication
 
+- [x] Add bounded same-model Gemini 503 retries and preserve provider-unavailable HTTP 503 through catalog extraction; cover recovery, exhaustion and long retry hints (48 provider/Studio/translation checks). Actual provider availability remains external.
+
+- [x] Add `cloudinary_gemini` for Cloudinary removal and direct Gemini 3.8 Flash catalog/pricing/translation calls; verify routing, Cloudinary preservation, missing-key behavior and no fallback with 45 provider/Studio/translation tests (2026-09-16).
+- [ ] Configure a Google Gemini key and validate live access and image/text quality for the third profile.
+
+- [x] Distinguish OpenRouter upstream rate limiting from daily quota and credit errors; show provider retry hints and isolate mocked provider tests from the active local profile (42 checks, 2026-09-16). Live Gemma availability remains provider-dependent.
+
+- [x] Add one backend provider profile for OpenAI or Cloudinary/OpenRouter across background removal, catalog, pricing vision and translation QA; preserve Groq business-text tasks. Support PNG previews, photo review, pending transformations and explicit failures without paid fallback. Verified with 79 backend and 34 focused Flutter tests (2026-09-16).
+- [ ] Add Cloudinary/OpenRouter credentials, activate `cloudinary_openrouter`, and validate actual photo outputs/account limits; mocked transport checks are not live integration acceptance. See [switching instructions](AI_PROVIDERS.md).
+
+- [x] Repair saved-photo Studio downloads and quote-wrapper filtering (2026-09-16); retain visible failure details. Verify relative/absolute backend photos, rejection of unrelated URLs, grounded evidence, and live synthetic-image editing/extraction. Real-photo quality validation remains open.
+
+- [x] Correct Studio sequence (2026-09-15): photo Next automatically extracts details, asks only missing fields, then opens full editable review before Listen & Verify; remove the photo-suggestion action from verification. Preserve entered answers when leaving review and keep explicit approval before pricing.
+
+- [x] Add 300 ms throttled ML Kit product framing/lighting guidance, bilingual shared TTS, manual capture and five-check detection fallback; cover rule and frame-pipeline behavior with automated tests (2026-09-14).
+- [x] Ask only missing catalog fields after AI extraction, then show all catalog fields for explicit review/correction; preserve known values and manual fallback.
+- [ ] Calibrate capture size/brightness thresholds for basket, pot and textile on the actual demo phone/lighting (30?60 minutes); validate rotation, lifecycle, voice and detection fallback on device.
+
+
 - [x] Replace the active photo pipeline with authenticated OpenAI white-background editing, deterministic natural exposure and optional-cleanup B2B framing (2026-09-14). Add original-image catalog suggestions with field/evidence filtering, correction, unchanged artisan values and explicit image review. Persist photo metadata through the real product API. [Configuration and boundaries](OPENAI_PRODUCT_STUDIO.md). This supersedes the local-only photo path recorded below.
 - [x] Migrate Studio to OpenAI image edits and Responses-based catalog extraction; separate API-credit and rate-limit errors, preserve legacy Gemini photo review and original/manual fallbacks. ChatGPT subscription billing is separate.
+- [x] Fix pricing vision reading the wrong media directory (2026-09-15): `/pricing/analyze-image` resolved the stored product photo against `uploads/workspace/`, where product photos are never written, so every analysis ran with `image_path=None` and returned the hardcoded fallback (`score=0.5`, `is_fallback=True`) while still reporting success. It now resolves against `uploads/products/` and logs a warning when a stored photo is missing from disk. Covered by `backend/tests/test_pricing_vision_image.py`.
 - [ ] Validate the OpenAI key/model access and actual output quality on artisan photos, including pale products, handles/fringes, heavy shadow and textured tables. Mocked responses and synthetic tests do not establish live accuracy.
+- [x] Add advisory back-translation validation to Listen & Verify (2026-09-14): back-translate the generated Hindi description to English with OpenAI and judge factual equivalence, then show a checked/warning chip. It never blocks the step, and an unavailable check stores no score and shows no chip. Bhashini MT remains unimplemented.
+- [x] Move extraction, generation, negotiation and the back-translation judge onto the free Groq text tier with per-task `_MODEL`/`_BASE`/`_KEY` overrides and one OpenAI retry per call; replace the retired `llama-3.1-70b-versatile` slug with `openai/gpt-oss-120b`. Fallback triggers are scoped per task: confidence below 0.5 for extraction, JSON/schema failure for the others (2026-09-15). Groq has no vision model, so photo catalog suggestions, image edits and vision pricing stay on OpenAI.
+- [ ] Re-baseline the round-trip threshold against the Groq judge, calibrate it on real artisan listings, and validate the chip on device.
 
 - [x] Add an owner-only product availability switch with buyer-facing status, persisted boolean-only workflow updates, backend ownership checks and new-inquiry gating. Keep catalog approval/publication unchanged and capacity fields in the existing Edit & re-verify flow. Validate role/restart persistence and English/Hindi phone controls; defer live tenant-scoped commerce.
 
 - [x] Show the B2B background switch only when B2B catalogue frame is selected.
+
+- [x] Rework the artisan Home and bottom bar at user request (2026-09-15): four summary tiles (Products, Bidding with a Live Sessions marker, Inquiries, Orders), a paired Add a product / Host Bidding action row, a Bulk Bidding Hub card with a countdown, and My Products below it. Profile left the bottom bar for both roles and is now reached from the app bar avatar; the sign-out action lives only inside the profile screen. Bidding is a new tab. SCOPE OVERRIDE: `UPDATED_ARCHITECTURE.md` §34-39 and AGENTS.md exclude bidding from the demo, and this reverses that decision at the user's explicit instruction. The lot shown is a fixed sample with a countdown anchored to app start; sealed bidding has no backend, no offer can be accepted, and the card labels itself as a demonstration. `test/artisan_home_bidding_test.dart` covers the bar, the avatar route, the absence of sign out and the sample disclaimer; the buyer bar is unchanged.
+
+- [x] Make field dictation continue the held text instead of replacing it (2026-09-15): every mic press now snapshots the field's current content and appends the recognised words to it, so a second press no longer wipes what an earlier press or the artisan typed. On a re-press only that press's words are rebuilt, so refined partial results do not duplicate the earlier text; the caret lands at the end. Applies to every mic-enabled field because they all render the shared `VoiceFieldButton`. Recogniser access is behind an injectable `CraftDictation` seam, covered by `test/voice_field_button_test.dart`. On-device dictation accuracy itself remains unvalidated.
 
 - [x] Harden deterministic photo preparation (2026-09-13): 18px border seeds, protected central 70%, enclosed-island cleanup below 2%, and 3px outward feather. Natural mode skips masking; B2B fits retained bounds into 1200×1200 with 10% minimum margins and an optional whole-natural-photo setting. Full-image previews and original retention support review. Synthetic pixel regression tests pass; real textured-photo/device acceptance remains pending.
 
@@ -140,3 +192,7 @@ Demo fixtures should include at least two comparable artisans, a product with a 
 ## Checks when implementing
 
 Use existing Flutter localization/widget checks plus focused tests for new stateful behavior. Prioritize source-of-truth consistency across modes, unpublished visibility, readiness independence, cost-floor edge cases, unauthorized access, stale/duplicate quote acceptance, capacity conflicts, and payment/production/completion transitions. Include sample approval/rejection/waiver, optional checkpoint review versus payment confirmation, shipment versus inspection state, configurable milestone totals/window, unresolved issues blocking completion, issue evidence access, and reorder creating fresh state. Manually verify phone layout, spoken review/correction, denied permissions, API/AI failure fallback, and clearly labeled simulations. Mark each checklist item only after its acceptance behavior is demonstrated.
+
+- [x] Gemini photo request correction: use native `generateContent` with inline image bytes, native JSON response parsing, and distinct upstream HTTP errors. Removed blank duplicate Gemini configuration locally. Verified native image HTTP 200 versus compatibility HTTP 503 using the same key/model; 50 backend Studio/provider/translation tests passed. Flutter multipart and error-propagation regression coverage added. See `docs/AI_PROVIDERS.md`.
+
+Validation limit: the simple live native image call succeeded, but subsequent complete catalog requests still received Google HTTP 503 after bounded retries, including with low thinking effort. End-to-end live catalog success is not yet verified. All 50 backend tests and 20 Flutter Studio tests passed; Flutter analysis reported 157 existing warnings/info and no errors.

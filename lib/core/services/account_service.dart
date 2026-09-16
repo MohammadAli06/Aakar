@@ -62,6 +62,8 @@ class AccountService {
   }
 
   Future<Account> updateBuyerProfile({
+    String? workEmail,
+    String? website,
     String? name,
     String? languagePref,
     String? businessName,
@@ -71,6 +73,8 @@ class AccountService {
     String? district,
   }) async {
     final data = await _api.put('/auth/buyer-profile', data: {
+      if (workEmail != null) 'work_email': workEmail,
+      if (website != null) 'website': website,
       if (name != null) 'name': name,
       if (languagePref != null) 'language_pref': languagePref,
       if (businessName != null) 'business_name': businessName,

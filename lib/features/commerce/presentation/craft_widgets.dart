@@ -39,13 +39,26 @@ class CraftButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final IconData? icon;
   final bool secondary;
+
+  /// Small trailing chip, e.g. a LIVE marker on a primary workspace action.
+  final String? badge;
+
+  /// Stretch to the available width. Set false when placing the button in a Row,
+  /// where an infinite-width box cannot be laid out.
+  final bool expand;
   const CraftButton(this.label,
-      {super.key, this.onPressed, this.icon, this.secondary = false});
+      {super.key,
+      this.onPressed,
+      this.icon,
+      this.secondary = false,
+      this.badge,
+      this.expand = true});
+
   @override
   Widget build(BuildContext context) => Padding(
       padding: const EdgeInsets.only(top: 8, bottom: 4),
       child: SizedBox(
-          width: double.infinity,
+          width: expand ? double.infinity : null,
           child: secondary
               ? OutlinedButton(
                   onPressed: onPressed,
@@ -53,7 +66,17 @@ class CraftButton extends StatelessWidget {
                       minimumSize: const Size(0, 48),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10))),
-                  child: Text(label, textAlign: TextAlign.center))
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    if (icon != null) ...[
+                      Icon(icon, size: 18),
+                      const SizedBox(width: 8)
+                    ],
+                    Flexible(child: Text(label, textAlign: TextAlign.center)),
+                    if (badge != null) ...[
+                      const SizedBox(width: 8),
+                      _ButtonBadge(text: badge!)
+                    ]
+                  ]))
               : FilledButton(
                   onPressed: onPressed,
                   style: FilledButton.styleFrom(
@@ -66,8 +89,33 @@ class CraftButton extends StatelessWidget {
                       Icon(icon, size: 18),
                       const SizedBox(width: 8)
                     ],
-                    Flexible(child: Text(label, textAlign: TextAlign.center))
+                    Flexible(child: Text(label, textAlign: TextAlign.center)),
+                    if (badge != null) ...[
+                      const SizedBox(width: 8),
+                      _ButtonBadge(text: badge!)
+                    ]
                   ]))));
+}
+
+/// Sizes to its text. A plain Container would try to fill the button's Row, which
+/// lays out with unbounded main-axis constraints and fails the layout assertion.
+class _ButtonBadge extends StatelessWidget {
+  final String text;
+  const _ButtonBadge({required this.text});
+  @override
+  Widget build(BuildContext context) => IntrinsicWidth(
+      child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(
+              color: const Color(0xFFC4382F),
+              borderRadius: BorderRadius.circular(6)),
+          child: Text(text,
+              maxLines: 1,
+              overflow: TextOverflow.clip,
+              style: const TextStyle(
+                  fontSize: 8,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white))));
 }
 
 class StatusPill extends StatelessWidget {

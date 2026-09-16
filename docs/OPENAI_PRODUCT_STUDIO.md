@@ -1,5 +1,7 @@
 # OpenAI Product Studio
 
+**Provider switch (2026-09-16):** [AI provider setup](AI_PROVIDERS.md) is the current configuration guide for choosing OpenAI or Cloudinary + OpenRouter. The OpenAI-specific details below apply when `AI_PROVIDER_PROFILE=openai`.
+
 Migrated from Gemini to OpenAI on 2026-09-14. This replaces the active on-device flood-fill path with a backend preview service. The local Dart processing helpers remain for legacy use and tests; the app does not silently fall back to them when OpenAI fails.
 
 ## Configure the backend

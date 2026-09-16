@@ -3,6 +3,25 @@ from app.services.workflow_service import apply, seed, readiness
 
 
 class WorkflowTests(unittest.TestCase):
+    def test_reviews_require_completed_owned_orders_and_valid_rating(self):
+        self.state = seed()
+        self.state['orders'] = [{'id': 'review-order', 'buyer_id': 'buyer', 'artisan_id': 'ramesh', 'status': 'confirmed'}]
+        payload = dict(id='review-order', rating=5, text='Well made', tags=['Product quality'])
+        with self.assertRaises(ValueError):
+            self.act('review_order', payload)
+        self.state['orders'][0]['status'] = 'completed'
+        for change in [dict(rating=0), dict(rating=6), dict(rating=2.5), dict(text='a'*501), dict(tags=['Invented'])]:
+            with self.assertRaises(ValueError):
+                self.act('review_order', {**payload, **change})
+        with self.assertRaises(ValueError):
+            self.act('review_order', payload, actor='another-buyer')
+        with self.assertRaises(ValueError):
+            self.act('review_order', payload, role='artisan')
+        self.act('review_order', payload)
+        self.act('review_order', {**payload, 'rating': 4})
+        self.assertEqual(self.state['orders'][0]['review']['rating'], 4)
+        self.assertEqual(self.state['orders'][0]['review']['buyer_id'], 'buyer')
+
     def setUp(self):
         self.state = seed()
 
@@ -18,6 +37,13 @@ class WorkflowTests(unittest.TestCase):
         if not sample:
             self.act('accept', dict(id=self.rid, quote_id=self.qid))
             return self.state['orders'][0]['id']
+
+    def test_product_keeps_the_translation_check_on_the_record(self):
+        self.act('product', dict(id='basket', roundtrip_score=0.82,
+                                 translation_confidence='checked'), 'artisan')
+        product = self.state['products'][0]
+        self.assertEqual(product['roundtrip_score'], 0.82)
+        self.assertEqual(product['translation_confidence'], 'checked')
 
     def test_readiness_is_separate(self):
         p = self.state['products'][0]

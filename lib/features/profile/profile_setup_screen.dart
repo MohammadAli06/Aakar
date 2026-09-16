@@ -16,6 +16,8 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
   final _form = GlobalKey<FormState>();
   final _name = TextEditingController();
   final _business = TextEditingController();
+  final _workEmail = TextEditingController();
+  final _website = TextEditingController();
   final _state = TextEditingController();
   final _district = TextEditingController();
   String _craft = 'other';
@@ -30,6 +32,8 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
     final a = ref.read(sessionProvider).account;
     _name.text = a?.name ?? '';
     _business.text = a?.businessName ?? '';
+    _workEmail.text = '${a?.profile['work_email'] ?? ''}';
+    _website.text = '${a?.profile['website'] ?? ''}';
     _state.text = a?.state ?? '';
     _district.text = a?.profile['district'] as String? ?? '';
     _craft = a?.craftCategory ?? 'other';
@@ -39,7 +43,14 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
 
   @override
   void dispose() {
-    for (final c in [_name, _business, _state, _district]) {
+    for (final c in [
+      _name,
+      _business,
+      _state,
+      _district,
+      _workEmail,
+      _website
+    ]) {
       c.dispose();
     }
     super.dispose();
@@ -63,6 +74,8 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
             languagePref: language);
       } else {
         await api.updateBuyerProfile(
+            workEmail: _workEmail.text.trim(),
+            website: _website.text.trim(),
             name: _name.text.trim(),
             businessName: _business.text.trim(),
             businessType: _type,
@@ -166,6 +179,17 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                                 },
                                 (v) => _industry = v),
                           ],
+                          if (!artisan) ...[
+                            _contactField(
+                                _workEmail,
+                                t('Work email (optional)',
+                                    'कार्य ईमेल (वैकल्पिक)'),
+                                false),
+                            _contactField(
+                                _website,
+                                t('Website (optional)', 'वेबसाइट (वैकल्पिक)'),
+                                true),
+                          ],
                           if (artisan)
                             _dropdown(
                                 t('Your craft', 'आपकी कला'),
@@ -242,6 +266,37 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                   : null,
               decoration: InputDecoration(
                   labelText: label, prefixIcon: Icon(icon), counterText: '')));
+  Widget _contactField(
+          TextEditingController controller, String label, bool website) =>
+      Padding(
+          padding: const EdgeInsets.only(bottom: 18),
+          child: TextFormField(
+            controller: controller,
+            enabled: !_saving,
+            maxLength: website ? 500 : 320,
+            keyboardType:
+                website ? TextInputType.url : TextInputType.emailAddress,
+            autocorrect: false,
+            textCapitalization: TextCapitalization.none,
+            decoration: InputDecoration(
+                labelText: label,
+                counterText: '',
+                prefixIcon:
+                    Icon(website ? Icons.language : Icons.email_outlined)),
+            validator: (value) {
+              final v = value?.trim() ?? '';
+              if (v.isEmpty) return null;
+              final valid = website
+                  ? RegExp(r'^https?://[^/\s?#]+(?:[/?#][^\s]*)?$').hasMatch(v)
+                  : RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(v);
+              return valid
+                  ? null
+                  : (website
+                      ? t('Use a full https:// website address',
+                          'पूरा https:// वेबसाइट पता दें')
+                      : t('Enter a valid email', 'सही ईमेल दें'));
+            },
+          ));
   Widget _dropdown(String label, String value, Map<String, String> items,
           ValueChanged<String> update) =>
       Padding(

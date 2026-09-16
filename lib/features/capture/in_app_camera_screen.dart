@@ -1,3 +1,9 @@
+import 'dart:async';
+import 'dart:io';
+import '../commerce/presentation/craft_forms.dart';
+import '../commerce/presentation/craft_widgets.dart';
+import 'product_capture_guidance.dart';
+import 'product_frame_analyzer.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 
@@ -24,6 +30,42 @@ class _InAppCameraScreenState extends State<InAppCameraScreen>
   bool _capturing = false;
   bool _torch = false;
   String? _error;
+  ProductFrameAnalyzer? _analyzer;
+  int _generation = 0;
+  Future<void> _releasing = Future.value();
+  bool _active = true, _voice = true;
+  Timer? _speechTimer;
+  ProductCaptureHint _hint = ProductCaptureHint.searching;
+  ProductCaptureHint? _spoken;
+
+  void _setHint(ProductCaptureHint hint) {
+    if (!mounted) return;
+    if (_hint != hint) {
+      setState(() => _hint = hint);
+      _speechTimer?.cancel();
+    }
+    if (!_voice || _spoken == hint || _speechTimer?.isActive == true) return;
+    _speechTimer = Timer(const Duration(milliseconds: 1200), () {
+      if (!mounted || !_active || _capturing) return;
+      _spoken = hint;
+      speakCraft(context, bilingual(context, hint.en, hint.hi), silent: true);
+    });
+  }
+
+  Future<void> _release(
+      CameraController? controller, ProductFrameAnalyzer? analyzer) async {
+    _speechTimer?.cancel();
+    await stopCraftSpeech();
+    if (controller != null) {
+      try {
+        if (controller.value.isStreamingImages) {
+          await controller.stopImageStream();
+        }
+      } catch (_) {}
+      await controller.dispose();
+    }
+    await analyzer?.close();
+  }
 
   @override
   void initState() {
@@ -35,41 +77,74 @@ class _InAppCameraScreenState extends State<InAppCameraScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _controller?.dispose();
+    _active = false;
+    _generation++;
+    _releasing = _release(_controller, _analyzer);
+    _controller = null;
+    _analyzer = null;
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    final controller = _controller;
-    if (controller == null || !controller.value.isInitialized) return;
-    if (state == AppLifecycleState.inactive) {
-      _controller = null;
-      controller.dispose();
-    } else if (state == AppLifecycleState.resumed) {
+    if (state == AppLifecycleState.resumed) {
+      _active = true;
       _start();
+    } else if (state == AppLifecycleState.inactive) {
+      _active = false;
+      _generation++;
+      _releasing = _release(_controller, _analyzer);
+      _controller = null;
+      _analyzer = null;
     }
   }
 
   Future<void> _start() async {
+    final generation = ++_generation;
+    final previous = _controller;
+    final previousAnalyzer = _analyzer;
+    _controller = null;
+    _analyzer = null;
     if (mounted) setState(() => _initializing = true);
+    await _releasing;
+    await _release(previous, previousAnalyzer);
+    if (!mounted || !_active || generation != _generation) return;
     try {
-      final cameras =
-          _cameras.isNotEmpty ? _cameras : await availableCameras();
+      final cameras = _cameras.isNotEmpty ? _cameras : await availableCameras();
       if (cameras.isEmpty) {
         throw StateError('No camera is available on this device.');
       }
       _cameras = cameras;
-      final controller = CameraController(
+      var controller = CameraController(
         cameras[_index % cameras.length],
         ResolutionPreset.high,
         enableAudio: false,
+        imageFormatGroup:
+            Platform.isIOS ? ImageFormatGroup.bgra8888 : ImageFormatGroup.nv21,
       );
-      await controller.initialize();
-      if (_torch) {
-        await controller.setFlashMode(FlashMode.torch);
+      try {
+        await controller.initialize();
+      } catch (_) {
+        await controller.dispose();
+        // A device that rejects the analysis format can still take photos.
+        controller = CameraController(
+            cameras[_index % cameras.length], ResolutionPreset.high,
+            enableAudio: false);
+        try {
+          await controller.initialize();
+        } catch (_) {
+          await controller.dispose();
+          rethrow;
+        }
       }
-      if (!mounted) {
+      if (_torch) {
+        try {
+          await controller.setFlashMode(FlashMode.torch);
+        } catch (_) {
+          _torch = false;
+        }
+      }
+      if (!mounted || !_active || generation != _generation) {
         await controller.dispose();
         return;
       }
@@ -77,9 +152,28 @@ class _InAppCameraScreenState extends State<InAppCameraScreen>
         _controller = controller;
         _initializing = false;
         _error = null;
+        _hint = ProductCaptureHint.searching;
+        _spoken = null;
       });
+      final analyzer = ProductFrameAnalyzer();
+      _analyzer = analyzer;
+      try {
+        await controller.startImageStream((image) async {
+          if (_capturing || !_active || generation != _generation) return;
+          final hint = await analyzer.analyze(image, controller);
+          if (mounted &&
+              _active &&
+              !_capturing &&
+              generation == _generation &&
+              hint != null) {
+            _setHint(hint);
+          }
+        });
+      } catch (_) {
+        if (generation == _generation) _setHint(ProductCaptureHint.manual);
+      }
     } catch (e) {
-      if (mounted) {
+      if (mounted && generation == _generation) {
         setState(() {
           _error = e.toString();
           _initializing = false;
@@ -91,10 +185,6 @@ class _InAppCameraScreenState extends State<InAppCameraScreen>
   Future<void> _flip() async {
     if (_cameras.length < 2) return;
     _index = (_index + 1) % _cameras.length;
-    final previous = _controller;
-    _controller = null;
-    setState(() => _initializing = true);
-    await previous?.dispose();
     await _start();
   }
 
@@ -113,7 +203,12 @@ class _InAppCameraScreenState extends State<InAppCameraScreen>
     final controller = _controller;
     if (controller == null || _capturing) return;
     setState(() => _capturing = true);
+    _speechTimer?.cancel();
+    await stopCraftSpeech();
     try {
+      if (controller.value.isStreamingImages) {
+        await controller.stopImageStream();
+      }
       final file = await controller.takePicture();
       if (mounted) Navigator.of(context).pop(file.path);
     } catch (e) {
@@ -135,34 +230,34 @@ class _InAppCameraScreenState extends State<InAppCameraScreen>
           fit: StackFit.expand,
           children: [
             _preview(),
-            // Guide frame + hint
-            IgnorePointer(
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    CustomPaint(
-                      painter: _FramePainter(),
-                      child: const SizedBox(width: 300, height: 300),
-                    ),
-                    const SizedBox(height: 22),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.black54,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        context.tr('Place the product inside the frame'),
-                        style: const TextStyle(
-                            color: Colors.white, fontSize: 12),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            if (!_initializing && _error == null) ...[
+              IgnorePointer(
+                  child: LayoutBuilder(builder: (context, constraints) {
+                final side = (constraints.maxWidth * .75)
+                    .clamp(0.0, constraints.maxHeight * .55);
+                return Center(
+                    child: CustomPaint(
+                        painter: _FramePainter(_hint == ProductCaptureHint.ready
+                            ? Colors.greenAccent
+                            : Colors.white),
+                        child: SizedBox.square(dimension: side)));
+              })),
+              Positioned(
+                  bottom: 118,
+                  left: 20,
+                  right: 20,
+                  child: IgnorePointer(
+                      child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 8),
+                          decoration: BoxDecoration(
+                              color: Colors.black54,
+                              borderRadius: BorderRadius.circular(20)),
+                          child: Text(bilingual(context, _hint.en, _hint.hi),
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                  color: Colors.white, fontSize: 14))))),
+            ],
             _topBar(),
             _bottomBar(),
           ],
@@ -201,7 +296,9 @@ class _InAppCameraScreenState extends State<InAppCameraScreen>
     }
 
     final controller = _controller;
-    if (_initializing || controller == null || !controller.value.isInitialized) {
+    if (_initializing ||
+        controller == null ||
+        !controller.value.isInitialized) {
       return const Center(
           child: CircularProgressIndicator(color: Colors.white));
     }
@@ -236,16 +333,30 @@ class _InAppCameraScreenState extends State<InAppCameraScreen>
             icon: const Icon(Icons.close_rounded, color: Colors.white),
           ),
           const Spacer(),
+          IconButton(
+              tooltip:
+                  bilingual(context, 'Voice guidance', 'आवाज़ से मार्गदर्शन'),
+              onPressed: () {
+                setState(() => _voice = !_voice);
+                if (!_voice) {
+                  _speechTimer?.cancel();
+                  stopCraftSpeech();
+                } else {
+                  _spoken = null;
+                  _setHint(_hint);
+                }
+              },
+              icon: Icon(_voice ? Icons.volume_up : Icons.volume_off,
+                  color: Colors.white)),
           if (_cameras.length > 1)
             IconButton(
               tooltip: context.tr('Switch camera'),
-              onPressed: _initializing ? null : _flip,
-              icon: const Icon(Icons.cameraswitch_rounded,
-                  color: Colors.white),
+              onPressed: _initializing || _capturing ? null : _flip,
+              icon: const Icon(Icons.cameraswitch_rounded, color: Colors.white),
             ),
           IconButton(
             tooltip: context.tr('Flash'),
-            onPressed: _initializing ? null : _toggleTorch,
+            onPressed: _initializing || _capturing ? null : _toggleTorch,
             icon: Icon(
               _torch ? Icons.flash_on_rounded : Icons.flash_off_rounded,
               color: Colors.white,
@@ -263,9 +374,8 @@ class _InAppCameraScreenState extends State<InAppCameraScreen>
       right: 0,
       child: Center(
         child: GestureDetector(
-          onTap: (_initializing || _capturing || _error != null)
-              ? null
-              : _capture,
+          onTap:
+              (_initializing || _capturing || _error != null) ? null : _capture,
           child: Container(
             width: 76,
             height: 76,
@@ -277,8 +387,8 @@ class _InAppCameraScreenState extends State<InAppCameraScreen>
             child: _capturing
                 ? const Padding(
                     padding: EdgeInsets.all(20),
-                    child:
-                        CircularProgressIndicator(color: Colors.white, strokeWidth: 3),
+                    child: CircularProgressIndicator(
+                        color: Colors.white, strokeWidth: 3),
                   )
                 : const Icon(Icons.camera_alt_rounded,
                     color: Colors.white, size: 30),
@@ -290,11 +400,13 @@ class _InAppCameraScreenState extends State<InAppCameraScreen>
 }
 
 class _FramePainter extends CustomPainter {
+  const _FramePainter(this.color);
+  final Color color;
   @override
   void paint(Canvas canvas, Size size) {
     const corner = 34.0;
     final paint = Paint()
-      ..color = Colors.white
+      ..color = color
       ..strokeWidth = 4
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke;
@@ -315,5 +427,6 @@ class _FramePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _FramePainter oldDelegate) =>
+      oldDelegate.color != color;
 }

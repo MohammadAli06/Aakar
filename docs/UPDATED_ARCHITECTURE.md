@@ -1,5 +1,7 @@
 # Updated architecture and complete product flow
 
+**Bidding scope update, 2026-09-17:** The user explicitly requested the full reference flow, superseding the earlier deferred/sample-only bidding scope. Account-owned sessions, sealed offers, verified requirement matching, schedule management, allocation and persistent quotation handoff now replace the sample lot. Downstream quotation/order edits retain the existing local-demo boundary. See [Bidding flow and 14-step checklist](BIDDING_FLOW.md).
+
 Reconciled 2026-09-10 from the original architecture PDF, pasted revisions, final demo clarification, subsequent `1.pdf` lifecycle refinements, and repository inspection. Aakar is the current project name; the original vision calls it CraftConnect. This is the target architecture; see [project context](PROJECT_CONTEXT.md) for what exists today, [source provenance](sources/README.md) for limitations, and [lifecycle update coverage](LIFECYCLE_UPDATE.md) for all 12 new source sections.
 
 ## Decisions and scope

@@ -1,6 +1,9 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/localization/app_strings.dart';
 import '../../../core/services/api_client.dart';
 import '../../../core/services/studio_service.dart';
 import '../data/commerce_repository.dart';
@@ -17,6 +20,18 @@ class ProductStudioScreen extends ConsumerStatefulWidget {
       _ProductStudioScreenState();
 }
 
+/// Complexity from the vision service, clamped to the documented 0.0-1.0 range.
+/// Returns null for a missing, non-numeric or out-of-range value so the caller
+/// can show "AI analysis unavailable" rather than crashing on the field.
+double? aiComplexityScore(Object? data) {
+  if (data is! Map) return null;
+  final value = data['complexity_score'];
+  if (value is! num) return null;
+  final score = value.toDouble();
+  if (score.isNaN || score.isInfinite || score < 0 || score > 1) return null;
+  return score;
+}
+
 class _ProductStudioScreenState extends ConsumerState<ProductStudioScreen> {
   int step = 0;
   Record draft = {};
@@ -24,7 +39,8 @@ class _ProductStudioScreenState extends ConsumerState<ProductStudioScreen> {
   PhotoPrep? prepared;
   PhotoPrep? selectedPrep;
   bool catalogPlainBackground = true;
-  bool photoReviewed = true, catalogReviewed = false;
+  bool photoReviewed = true;
+  String? photoError;
   final transcript = TextEditingController();
 
   // AI Vision analysis (shown in pricing step)
@@ -32,18 +48,46 @@ class _ProductStudioScreenState extends ConsumerState<ProductStudioScreen> {
   bool _aiChipExpanded = false;
   Map<String, dynamic>? _aiResult;
 
+  // Back-translation check for the Listen & Verify step
+  Map<String, dynamic>? _translation;
+
+  // TTS speaking state — toggled by the Listen button
+  bool _speaking = false;
+
   String t(String en, String hi) => bilingual(context, en, hi);
+  String fieldText(CraftField field) {
+    final value = draft[field.key];
+    if (value == null || '$value'.trim().isEmpty) {
+      return t('Not provided', 'नहीं बताया');
+    }
+    if (value is bool) return value ? t('Yes', 'हाँ') : t('No', 'नहीं');
+    return catalogText(field.key);
+  }
+
   String catalogText(String key) => t(
       '${draft[key] ?? ''}',
       '${draft['${key}_hi'] ?? ''}'.trim().isEmpty
           ? '${draft[key] ?? ''}'
           : '${draft['${key}_hi']}');
+
+  /// `title_hi` and `description_hi` are the other-language renderings of the
+  /// title and description, not separate catalog attributes. Every list that
+  /// shows catalog content resolves the selected language through
+  /// [catalogText], so the Hindi companions are never repeated there.
+  List<CraftField> get catalogFields => productFields
+      .where((f) => f.key != 'title_hi' && f.key != 'description_hi')
+      .toList();
+
+  /// Form fields offer the Hindi companions only while the app is in Hindi, so
+  /// an English reader is never asked for Hindi wording.
+  List<CraftField> get formFields =>
+      context.isHindi ? productFields : catalogFields;
+
   @override
   void initState() {
     super.initState();
     final repo = ref.read(commerceProvider);
     draft = {...?repo.lookup('products', widget.productId)};
-    catalogReviewed = widget.productId != null;
     photoReviewed = draft['photo_reviewed'] != false;
     catalogPlainBackground = draft['catalog_plain_background'] != false;
     transcript.text = '${draft['transcript'] ?? ''}';
@@ -52,10 +96,19 @@ class _ProductStudioScreenState extends ConsumerState<ProductStudioScreen> {
         .map((option) => option.mode)
         .firstOrNull;
     if (widget.productId != null) step = 2;
+    if (step == 2) _checkTranslation();
+    // Reset speaking state when TTS finishes naturally
+    craftTts.setCompletionHandler(() {
+      if (mounted) setState(() => _speaking = false);
+    });
+    craftTts.setCancelHandler(() {
+      if (mounted) setState(() => _speaking = false);
+    });
   }
 
   @override
   void dispose() {
+    stopCraftSpeech(); // stop TTS if artisan navigates away mid-speech
     transcript.dispose();
     super.dispose();
   }
@@ -90,7 +143,7 @@ class _ProductStudioScreenState extends ConsumerState<ProductStudioScreen> {
       selectedPrep = null;
       verified = false;
       photoReviewed = true;
-      catalogReviewed = false;
+      photoError = null;
     });
   }
 
@@ -107,6 +160,7 @@ class _ProductStudioScreenState extends ConsumerState<ProductStudioScreen> {
     }
     setState(() {
       working = true;
+      photoError = null;
       selectedPrep = mode;
     });
     try {
@@ -130,8 +184,10 @@ class _ProductStudioScreenState extends ConsumerState<ProductStudioScreen> {
         }
       });
     } catch (e) {
-      message(
-          '${t('Photo preparation failed; your previous photo is unchanged.', 'फ़ोटो तैयार नहीं हुई; पिछली फ़ोटो सुरक्षित है।')} $e');
+      if (mounted) {
+        setState(() => photoError =
+            '${t('Photo preparation failed; your previous photo is unchanged. Tap the option again to retry.', 'फ़ोटो तैयार नहीं हुई; पिछली फ़ोटो सुरक्षित है। फिर कोशिश करने के लिए विकल्प दबाएँ।')} $e');
+      }
     } finally {
       if (mounted) setState(() => working = false);
     }
@@ -148,20 +204,22 @@ class _ProductStudioScreenState extends ConsumerState<ProductStudioScreen> {
         verified = false;
       });
 
-  Future<void> details({bool analyzePhoto = false}) async {
+  Future<void> details() async {
     if (working || !photoReviewed) return;
+    final editing = step == 2;
     final text = transcript.text.trim();
     Record assistance = {'fields': {}, 'provenance': 'Manual draft'};
+    String? catalogNotice;
     final original = '${draft['original_image'] ?? draft['image'] ?? ''}';
     setState(() => working = true);
-    if ((!catalogReviewed || analyzePhoto) && StudioService.isPhoto(original)) {
+    if (!editing && StudioService.isPhoto(original)) {
       try {
         assistance = await ref
             .read(studioServiceProvider)
             .analyze(original, text, t('en', 'hi'));
       } catch (e) {
-        message(
-            '${t('Photo suggestions unavailable. You can enter the details manually.', 'फ़ोटो से सुझाव नहीं मिले। विवरण खुद भर सकते हैं।')} $e');
+        catalogNotice =
+            '${t('Photo suggestions unavailable. Go back to retry, or enter the details manually.', 'फ़ोटो से सुझाव नहीं मिले। फिर कोशिश के लिए वापस जाएँ या विवरण खुद भरें।')} $e';
       }
     }
     if (!mounted) return;
@@ -170,40 +228,67 @@ class _ProductStudioScreenState extends ConsumerState<ProductStudioScreen> {
       'description': '',
       'material': '',
       'available': true,
-      'stock': 0,
-      'capacity': 0,
       'location': ref.read(commerceProvider).profile['location'],
       ...draft,
     }, Map<String, dynamic>.from(assistance['fields'] as Map));
     if ('${initial['description'] ?? ''}'.trim().isEmpty) {
       initial['description'] = text;
     }
-    final questions = (assistance['questions'] as List? ?? []).join('\n');
-    final evidence =
-        Map<String, dynamic>.from(assistance['evidence'] as Map? ?? {});
-    final evidenceText = evidence.entries.map((e) {
-      final label = productFields.where((f) => f.key == e.key).firstOrNull;
-      return '${label == null ? e.key : t(label.en, label.hi)}: ${(e.value as Map)['reason']}';
-    }).join('\n');
-    final d = await craftForm(
-        context,
-        t('Review catalog & fill gaps', 'कैटलॉग जाँचें और कमी भरें'),
-        productFields,
-        initial: initial,
-        description:
-            '${t('Photo suggestions need your review. Price, measurements and capacity stay manual.', 'फ़ोटो के सुझाव जाँचें। कीमत, माप और क्षमता खुद भरें।')}\n$evidenceText\n$questions');
-    if (d != null && mounted)
+    final fields = editing
+        ? formFields
+        : formFields.where((field) {
+            final value = initial[field.key];
+            return value == null ||
+                '$value'.trim().isEmpty ||
+                (field.options != null && !field.options!.contains('$value'));
+          }).toList();
+    var d = fields.isEmpty
+        ? initial
+        : await craftForm(
+            context,
+            editing
+                ? t('Review catalog details', 'कैटलॉग जाँचें')
+                : t('Fill missing details', 'बाकी विवरण भरें'),
+            fields,
+            initial: initial,
+            button: editing
+                ? t('Continue to Listen & Verify', 'सुनें और जाँचें')
+                : t('Review catalog', 'कैटलॉग जाँचें'),
+            description: editing
+                ? null
+                : [
+                    if (catalogNotice != null) catalogNotice,
+                    t('Add the missing details. You can review and correct everything on the next screen.',
+                        'बाकी विवरण भरें। अगले पन्ने पर सब जाँच और सुधार सकते हैं।')
+                  ].join('\n\n'));
+    if (d == null || !mounted) return;
+    // Keep the completed answers if the artisan backs out of the full review.
+    setState(() {
+      draft = {...draft, ...d!, 'transcript': text};
+      verified = false;
+    });
+    if (!editing) {
+      d = await craftForm(
+          context, t('Review catalog details', 'कैटलॉग जाँचें'), formFields,
+          initial: draft,
+          description: t(
+              'Review all details, including the details filled from your photo. Correct anything before listening and verifying.',
+              'फ़ोटो से भरे विवरण सहित सब जाँचें। सुनने और पुष्टि करने से पहले सुधार करें।'),
+          button: t('Continue to Listen & Verify', 'सुनें और जाँचें'));
+    }
+    if (d != null && mounted) {
       setState(() {
-        draft = {...draft, ...d, 'transcript': text};
+        draft = {...draft, ...d!, 'transcript': text};
         verified = false;
-        catalogReviewed = true;
         step = 2;
       });
+      _checkTranslation();
+    }
   }
 
   Future<void> price() async {
     // Pre-fill complexity from AI if available, else keep draft value
-    final aiComplexity = _aiResult?['complexity_score'];
+    final aiComplexity = aiComplexityScore(_aiResult);
     final d = await craftForm(
         context, t('Explainable pricing', 'समझने योग्य कीमत'), const [
       CraftField('material_cost', 'Material cost per unit (INR)',
@@ -243,28 +328,104 @@ class _ProductStudioScreenState extends ConsumerState<ProductStudioScreen> {
     _analyzeForPricing();
   }
 
-  /// Calls /pricing/analyze-image to get GPT vision assessment.
-  /// Result is shown as a chip in step 3 UI.
+  /// Calls the pricing vision endpoint to get GPT craftsmanship assessment.
+  /// - Saved products (productId known): POST /pricing/analyze-image (uses DB record)
+  /// - New products (no productId yet): POST /pricing/analyze-draft (sends image inline)
   Future<void> _analyzeForPricing() async {
-    final productId = widget.productId ?? draft['id'];
-    if (productId == null) return;
     setState(() => _aiLoading = true);
     try {
-      final data = await apiClient.post(
-        '/pricing/analyze-image',
-        data: {'product_id': '$productId'},
-      );
-      if (mounted) {
+      final productId = widget.productId ?? draft['id'];
+      Map<String, dynamic>? result;
+
+      if (productId != null) {
+        // Existing product saved in DB — use the standard endpoint
+        final data = await apiClient.post(
+          '/pricing/analyze-image',
+          data: {'product_id': '$productId'},
+        );
+        result = _knownAiResult(data);
+      } else {
+        // Brand-new draft not yet in DB — send image + description inline
+        final imagePath = '${draft['image'] ?? draft['original_image'] ?? ''}';
+        String? imageB64;
+        if (imagePath.isNotEmpty &&
+            StudioService.isPhoto(imagePath) &&
+            !imagePath.startsWith('http')) {
+          try {
+            final bytes = await File(imagePath).readAsBytes();
+            imageB64 = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+          } catch (_) {
+            // Image unreadable — run text-only analysis
+          }
+        }
+        final description =
+            '${draft['description'] ?? draft['transcript'] ?? ''}';
+        final data = await apiClient.post(
+          '/pricing/analyze-draft',
+          data: {
+            'image_b64': imageB64,
+            'description': description,
+          },
+        );
+        result = _knownAiResult(data);
+      }
+
+      if (mounted)
         setState(() {
-          _aiResult = data as Map<String, dynamic>;
+          _aiResult = result;
           _aiLoading = false;
         });
-      }
     } catch (_) {
       if (mounted) setState(() => _aiLoading = false);
     }
   }
 
+  /// The chip can only render a real assessment, so an unrecognised or scoreless
+  /// response is treated as unavailable instead of reaching the UI. A provider
+  /// error, an older backend or a proxy must never take the pricing step down.
+  Map<String, dynamic>? _knownAiResult(Object? data) {
+    if (data is! Map) return null;
+    final score = aiComplexityScore(data);
+    if (score == null) return null;
+    return {...Map<String, dynamic>.from(data), 'complexity_score': score};
+  }
+
+  /// Back-translation check for the Listen & Verify step.
+  ///
+  /// Advisory only: it never blocks the step, and an unavailable check clears any
+  /// stored score rather than leaving a stale "checked" claim on the product.
+  Future<void> _checkTranslation() async {
+    final english = '${draft['description'] ?? ''}'.trim();
+    final translated = '${draft['description_hi'] ?? ''}'.trim();
+    if (english.isEmpty || translated.isEmpty) {
+      if (mounted && _translation != null) setState(() => _translation = null);
+      return;
+    }
+    try {
+      final result = await ref
+          .read(studioServiceProvider)
+          .checkTranslation(english, translated);
+      if (!mounted) return;
+      setState(() {
+        _translation = result;
+        if (result['is_fallback'] == true) {
+          draft.remove('roundtrip_score');
+          draft.remove('translation_confidence');
+        } else {
+          draft['roundtrip_score'] = result['roundtrip_score'];
+          draft['translation_confidence'] = result['confidence_label'];
+        }
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _translation = null;
+          draft.remove('roundtrip_score');
+          draft.remove('translation_confidence');
+        });
+      }
+    }
+  }
 
   Future<void> save() async {
     final d = await craftForm(
@@ -390,8 +551,8 @@ class _ProductStudioScreenState extends ConsumerState<ProductStudioScreen> {
                             t('Choose how to prepare this photo',
                                 'यह फ़ोटो कैसे तैयार करें'),
                             subtitle: t(
-                                'White-background edits and photo suggestions use OpenAI through our backend. Your original is kept. Compare AI edits carefully: colour, shape and craft details can change.',
-                                'सफ़ेद बैकग्राउंड और फ़ोटो के सुझाव हमारे सर्वर से OpenAI का उपयोग करते हैं। मूल फ़ोटो सुरक्षित रहती है। AI के बदलाव जाँचें: रंग, आकार या शिल्प बदल सकता है।')),
+                                'Background removal and photo suggestions keep your original. Compare the result carefully: colour, shape and craft details must be preserved.',
+                                'बैकग्राउंड हटाने और फ़ोटो के सुझावों में मूल फ़ोटो सुरक्षित रहती है। परिणाम जाँचें: रंग, आकार और शिल्प के विवरण सुरक्षित होने चाहिए।')),
                         for (final option in photoPrepOptions)
                           _PrepOptionCard(
                               option: option,
@@ -433,7 +594,7 @@ class _ProductStudioScreenState extends ConsumerState<ProductStudioScreen> {
                                 style: const TextStyle(fontSize: 11))
                           ]))
                         ]),
-                        if (const ['gemini', 'openai']
+                        if (const ['gemini', 'openai', 'cloudinary']
                             .contains(draft['photo_provider']))
                           CheckboxListTile(
                               key: const ValueKey('photo-fidelity-review'),
@@ -468,8 +629,10 @@ class _ProductStudioScreenState extends ConsumerState<ProductStudioScreen> {
                                     'सामग्री, माप, कैसे बनाया और कहानी…'),
                                 suffixIcon:
                                     VoiceFieldButton(controller: transcript))),
-                        CraftButton(
-                            t('Review catalog details', 'कैटलॉग विवरण जाँचें'),
+                        if (photoError != null)
+                          Text(photoError!,
+                              key: const ValueKey('photo-preparation-error')),
+                        CraftButton(t('Next', 'आगे'),
                             onPressed:
                                 working || !photoReviewed ? null : details)
                       ],
@@ -494,18 +657,50 @@ class _ProductStudioScreenState extends ConsumerState<ProductStudioScreen> {
                                       fontSize: 13, height: 1.6)),
                               DetailRow(t('Photo preparation', 'फ़ोटो तैयारी'),
                                   prepLabel),
-                              DetailRow(t('Material', 'सामग्री'),
-                                  '${draft['material'] ?? ''}'),
-                              DetailRow(t('Dimensions', 'माप'),
-                                  '${draft['dimensions'] ?? ''}'),
-                              DetailRow(t('Craft', 'शिल्प'),
-                                  '${draft['craft'] ?? ''}'),
+                              for (final field in catalogFields.where((f) =>
+                                  f.key != 'title' && f.key != 'description'))
+                                DetailRow(
+                                    t(field.en, field.hi), fieldText(field)),
+                              if (_translation != null &&
+                                  _translation!['is_fallback'] != true) ...[
+                                StatusPill(
+                                    _translation!['confidence_label'] ==
+                                            'checked'
+                                        ? t('Translation checked ✓',
+                                            'अनुवाद जाँचा गया ✓')
+                                        : t('Please listen carefully',
+                                            'ध्यान से सुनें'),
+                                    warning:
+                                        _translation!['confidence_label'] !=
+                                            'checked'),
+                                const SizedBox(height: 8),
+                              ],
                               CraftButton(
-                                  t('Listen to my catalog',
-                                      'मेरा कैटलॉग सुनें'),
+                                  _speaking
+                                      ? t('Stop listening', 'रोकें')
+                                      : t('Listen to my catalog',
+                                          'मेरा कैटलॉग सुनें'),
                                   secondary: true,
-                                  onPressed: () => speakCraft(context,
-                                      '${catalogText('title')}. ${catalogText('description')}. ${draft['material'] ?? ''}. ${draft['dimensions'] ?? ''}.')),
+                                  icon: _speaking
+                                      ? Icons.stop_circle_outlined
+                                      : Icons.volume_up_outlined,
+                                  onPressed: () async {
+                                if (_speaking) {
+                                  // Stop — user tapped again while playing
+                                  await stopCraftSpeech();
+                                  if (mounted)
+                                    setState(() => _speaking = false);
+                                } else {
+                                  // Start speaking
+                                  setState(() => _speaking = true);
+                                  await speakCraft(
+                                      context,
+                                      catalogFields
+                                          .map((field) =>
+                                              '${t(field.en, field.hi)}: ${fieldText(field)}')
+                                          .join('. '));
+                                }
+                              }),
                               CraftButton(
                                   t('Replace product photo',
                                       'उत्पाद की फ़ोटो बदलें'),
@@ -519,15 +714,6 @@ class _ProductStudioScreenState extends ConsumerState<ProductStudioScreen> {
                                       'विवरण / आवाज़ से सुधारें'),
                                   secondary: true,
                                   onPressed: working ? null : details),
-                              if (StudioService.isPhoto(
-                                  '${draft['original_image'] ?? draft['image'] ?? ''}'))
-                                CraftButton(
-                                    t('Suggest missing details from photo',
-                                        'फ़ोटो से बाकी विवरण सुझाएँ'),
-                                    secondary: true,
-                                    onPressed: working
-                                        ? null
-                                        : () => details(analyzePhoto: true)),
                               CheckboxListTile(
                                   contentPadding: EdgeInsets.zero,
                                   title: Text(
@@ -550,130 +736,121 @@ class _ProductStudioScreenState extends ConsumerState<ProductStudioScreen> {
                                 'आपकी मेहनत की कीमत है। सुझाव लागत से कम नहीं होगा।')),
 
                         // ── AI Vision Assessment Chip ──────────────────
-                        GestureDetector(
-                          onTap: () => setState(
-                              () => _aiChipExpanded = !_aiChipExpanded),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 220),
-                            margin: const EdgeInsets.only(bottom: 12),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 10),
-                            decoration: BoxDecoration(
-                              color: _aiLoading
-                                  ? const Color(0xFFF5F5F0)
-                                  : (_aiResult?['is_fallback'] == true)
-                                      ? const Color(0xFFF5F5F0)
-                                      : const Color(0xFFEAF3EA),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: _aiLoading
-                                    ? const Color(0xFFDDDDDD)
-                                    : (_aiResult?['is_fallback'] == true)
-                                        ? const Color(0xFFDDDDDD)
-                                        : const Color(0xFF5A7A5C)
-                                            .withValues(alpha: 0.4),
+                        // Only claimed as an assessment when a real score came back;
+                        // otherwise it reads as unavailable (see _knownAiResult).
+                        Builder(builder: (context) {
+                          final score = aiComplexityScore(_aiResult);
+                          final assessed = !_aiLoading &&
+                              score != null &&
+                              _aiResult?['is_fallback'] != true;
+                          return GestureDetector(
+                            onTap: () => setState(
+                                () => _aiChipExpanded = !_aiChipExpanded),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 220),
+                              margin: const EdgeInsets.only(bottom: 12),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: assessed
+                                    ? const Color(0xFFEAF3EA)
+                                    : const Color(0xFFF5F5F0),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: assessed
+                                      ? const Color(0xFF5A7A5C)
+                                          .withValues(alpha: 0.4)
+                                      : const Color(0xFFDDDDDD),
+                                ),
                               ),
-                            ),
-                            child: _aiLoading
-                                ? const Row(children: [
-                                    SizedBox(
-                                      width: 14,
-                                      height: 14,
-                                      child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: Color(0xFF285448)),
-                                    ),
-                                    SizedBox(width: 10),
-                                    Text(
-                                        '🤖  Analyzing your product photo…',
-                                        style: TextStyle(
-                                            fontSize: 12,
-                                            color: Color(0xFF6E796A))),
-                                  ])
-                                : Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Row(children: [
-                                        Text(
-                                          _aiResult?['is_fallback'] == true
-                                              ? '⚙️'
-                                              : '🤖',
-                                          style:
-                                              const TextStyle(fontSize: 15),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Text(
-                                            _aiResult == null
-                                                ? 'AI analysis unavailable'
-                                                : _aiResult!['is_fallback'] ==
-                                                        true
-                                                    ? 'Adjust craftsmanship manually (AI unavailable)'
-                                                    : '🤖 AI assessed: ${((_aiResult!['complexity_score'] as num) * 100).toInt()}% craftsmanship  •  ${_aiResult!['material_tier']} material',
-                                            style: TextStyle(
+                              child: _aiLoading
+                                  ? const Row(children: [
+                                      SizedBox(
+                                        width: 14,
+                                        height: 14,
+                                        child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: Color(0xFF285448)),
+                                      ),
+                                      SizedBox(width: 10),
+                                      Text('🤖  Analyzing your product photo…',
+                                          style: TextStyle(
                                               fontSize: 12,
-                                              fontWeight: FontWeight.w600,
-                                              color: _aiResult?[
-                                                          'is_fallback'] ==
-                                                      true
-                                                  ? const Color(0xFF6E796A)
-                                                  : const Color(0xFF285448),
+                                              color: Color(0xFF6E796A))),
+                                    ])
+                                  : Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(children: [
+                                          Text(assessed ? '🤖' : '⚙️',
+                                              style: const TextStyle(
+                                                  fontSize: 15)),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              assessed
+                                                  ? '🤖 AI assessed: ${(score * 100).toInt()}% craftsmanship  •  ${_aiResult?['material_tier'] ?? ''} material'
+                                                  : score != null
+                                                      ? 'Adjust craftsmanship manually (AI unavailable)'
+                                                      : 'AI analysis unavailable',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600,
+                                                color: assessed
+                                                    ? const Color(0xFF285448)
+                                                    : const Color(0xFF6E796A),
+                                              ),
                                             ),
                                           ),
-                                        ),
-                                        if (_aiResult?['is_fallback'] !=
-                                            true)
-                                          Icon(
-                                            _aiChipExpanded
-                                                ? Icons.expand_less_rounded
-                                                : Icons.expand_more_rounded,
-                                            size: 18,
-                                            color: const Color(0xFF6E796A),
-                                          ),
-                                      ]),
-                                      // Progress bar for complexity
-                                      if (_aiResult?['is_fallback'] != true)
-                                        Padding(
-                                          padding:
-                                              const EdgeInsets.only(top: 8),
-                                          child: ClipRRect(
-                                            borderRadius:
-                                                BorderRadius.circular(4),
-                                            child: LinearProgressIndicator(
-                                              value: (_aiResult![
-                                                      'complexity_score']
-                                                  as num)
-                                                  .toDouble(),
-                                              minHeight: 5,
-                                              backgroundColor:
-                                                  const Color(0xFFDDE7DF),
-                                              color: const Color(0xFF5A7A5C),
+                                          if (assessed)
+                                            Icon(
+                                              _aiChipExpanded
+                                                  ? Icons.expand_less_rounded
+                                                  : Icons.expand_more_rounded,
+                                              size: 18,
+                                              color: const Color(0xFF6E796A),
+                                            ),
+                                        ]),
+                                        // Progress bar for complexity
+                                        if (assessed)
+                                          Padding(
+                                            padding:
+                                                const EdgeInsets.only(top: 8),
+                                            child: ClipRRect(
+                                              borderRadius:
+                                                  BorderRadius.circular(4),
+                                              child: LinearProgressIndicator(
+                                                value: score,
+                                                minHeight: 5,
+                                                backgroundColor:
+                                                    const Color(0xFFDDE7DF),
+                                                color: const Color(0xFF5A7A5C),
+                                              ),
                                             ),
                                           ),
-                                        ),
-                                      // Expandable reasoning
-                                      if (_aiChipExpanded &&
-                                          _aiResult?['is_fallback'] != true)
-                                        Padding(
-                                          padding:
-                                              const EdgeInsets.only(top: 10),
-                                          child: Text(
-                                            bilingual(
-                                                context,
-                                                '${_aiResult!['reasoning_en']}',
-                                                '${_aiResult!['reasoning_hi']}'),
-                                            style: const TextStyle(
-                                              fontSize: 11,
-                                              color: Color(0xFF6E796A),
-                                              height: 1.5,
+                                        // Expandable reasoning
+                                        if (_aiChipExpanded && assessed)
+                                          Padding(
+                                            padding:
+                                                const EdgeInsets.only(top: 10),
+                                            child: Text(
+                                              bilingual(
+                                                  context,
+                                                  '${_aiResult?['reasoning_en'] ?? ''}',
+                                                  '${_aiResult?['reasoning_hi'] ?? ''}'),
+                                              style: const TextStyle(
+                                                fontSize: 11,
+                                                color: Color(0xFF6E796A),
+                                                height: 1.5,
+                                              ),
                                             ),
                                           ),
-                                        ),
-                                    ],
-                                  ),
-                          ),
-                        ),
+                                      ],
+                                    ),
+                            ),
+                          );
+                        }),
 
                         CraftCard(
                             child: Column(children: [

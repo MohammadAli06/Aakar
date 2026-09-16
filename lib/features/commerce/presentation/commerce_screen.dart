@@ -7,7 +7,12 @@ import '../../../shared/models/account.dart';
 import '../data/commerce_repository.dart';
 import '../domain/commerce_engine.dart';
 import 'craft_forms.dart';
+import 'bidding_panel.dart';
+import '../data/bidding_repository.dart';
 import 'craft_widgets.dart';
+import 'buyer_flow_widgets.dart';
+
+part 'buyer_experience.dart';
 
 /// Turns an enum-style value such as `pottery` into `Pottery`, which is the key
 /// the translation table expects.
@@ -27,10 +32,14 @@ class _CommerceScreenState extends ConsumerState<CommerceScreen> {
   final selected = <String>{};
   String category = 'All', location = 'All', sort = 'Recommended';
   bool verifiedOnly = false;
+  String notificationFilter = 'All',
+      supplierSection = 'Overview',
+      priceBand = 'All';
+  void _updateBuyer(VoidCallback change) => setState(change);
   CommerceRepository get repo => ref.read(commerceProvider);
   String t(String en, String hi) => bilingual(context, en, hi);
-  void go(String page, [String? id]) =>
-      context.push('/workspace/$page${id == null ? '' : '/$id'}');
+  void go(String page, [String? id]) => context.push(
+      '/workspace/$page${id == null || id.isEmpty ? '' : '/${Uri.encodeComponent(id)}'}');
 
   String _timeGreeting() {
     final hour = DateTime.now().hour;
@@ -38,6 +47,19 @@ class _CommerceScreenState extends ConsumerState<CommerceScreen> {
     if (hour >= 12 && hour < 17) return t('GOOD AFTERNOON,', 'नमस्ते,');
     if (hour >= 17 && hour < 21) return t('GOOD EVENING,', 'शुभ संध्या,');
     return t('GOOD NIGHT,', 'शुभ रात्रि,');
+  }
+
+  /// First letter of the signed-in account for the app bar avatar.
+  String _profileInitial() {
+    final name = ref.watch(sessionProvider).account?.displayName.trim() ?? '';
+    return name.isEmpty ? '?' : name.characters.first.toUpperCase();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.page == 'discover' && widget.id != null)
+      search.text = widget.id!;
   }
 
   @override
@@ -104,15 +126,18 @@ class _CommerceScreenState extends ConsumerState<CommerceScreen> {
       'home',
       'discover',
       'products',
+      'bidding',
       'inquiries',
       'orders',
       'notifications',
       'profile'
     ];
     final isRoot = rootPages.contains(widget.page);
+    // Profile is no longer a tab: it is reached from the app bar avatar instead,
+    // for both roles, so the bar keeps five destinations that are all workflows.
     final items = buyer
-        ? ['home', 'discover', 'orders', 'notifications', 'profile']
-        : ['home', 'products', 'inquiries', 'orders', 'profile'];
+        ? ['home', 'discover', 'bidding', 'orders', 'notifications']
+        : ['home', 'products', 'bidding', 'inquiries', 'orders'];
     final index = items.indexOf(widget.page);
     return Scaffold(
       backgroundColor: const Color(0xFFF8F7F2),
@@ -144,31 +169,23 @@ class _CommerceScreenState extends ConsumerState<CommerceScreen> {
                 tooltip: t('Choose your language', 'अपनी भाषा चुनें'),
                 onPressed: () => context.push('/language'),
                 icon: const Icon(Icons.language, size: 21)),
-            IconButton(
-                tooltip: t('Sign out', 'साइन आउट'),
-                onPressed: () async {
-                  final confirmed = await showDialog<bool>(
-                      context: context,
-                      builder: (dialog) => AlertDialog(
-                            title: Text(t('Sign out?', 'साइन आउट करें?')),
-                            content: Text(t(
-                                'You will need to sign in again to continue.',
-                                'जारी रखने के लिए दोबारा साइन इन करना होगा।')),
-                            actions: [
-                              TextButton(
-                                  onPressed: () => Navigator.pop(dialog, false),
-                                  child: Text(t('Cancel', 'रद्द करें'))),
-                              TextButton(
-                                  onPressed: () => Navigator.pop(dialog, true),
-                                  child: Text(t('Sign out', 'साइन आउट'))),
-                            ],
-                          ));
-                  if (confirmed == true) {
-                    await ref.read(sessionProvider).signOut();
-                  }
-                },
-                icon: const Icon(Icons.logout_rounded, size: 21)),
-            const SizedBox(width: 5)
+            // Profile moved here when it left the bottom bar. Sign out stays inside
+            // the profile screen so it is never one stray tap from the home screen.
+            Padding(
+                padding: const EdgeInsets.only(right: 10),
+                child: Tooltip(
+                    message: t('Your profile', 'आपकी प्रोफ़ाइल'),
+                    child: InkWell(
+                        onTap: () => context.go('/workspace/profile'),
+                        customBorder: const CircleBorder(),
+                        child: CircleAvatar(
+                            radius: 16,
+                            backgroundColor: const Color(0xFFE4EEE5),
+                            child: Text(_profileInitial(),
+                                style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF285448)))))))
           ]),
       body: SafeArea(
           child: !store.ready
@@ -250,6 +267,7 @@ class _CommerceScreenState extends ConsumerState<CommerceScreen> {
     'notifications': Icons.notifications_outlined,
     'profile': Icons.person_outline,
     'products': Icons.inventory_2_outlined,
+    'bidding': Icons.gavel_outlined,
     'inquiries': Icons.forum_outlined
   };
   String navLabel(String page) => switch (page) {
@@ -259,6 +277,7 @@ class _CommerceScreenState extends ConsumerState<CommerceScreen> {
         'notifications' => t('Alerts', 'सूचनाएँ'),
         'profile' => t('Profile', 'प्रोफ़ाइल'),
         'products' => t('Products', 'उत्पाद'),
+        'bidding' => t('Bidding', 'बोली'),
         _ => t('Inquiries', 'पूछताछ')
       };
   List<Widget> body() {
@@ -287,12 +306,22 @@ class _CommerceScreenState extends ConsumerState<CommerceScreen> {
         return orderList();
       case 'order':
         return current == null ? missing() : orderDetail(current!);
+      case 'bidding':
+        return bidding();
       case 'notifications':
-        return notifications();
+        return repo.role == 'buyer' ? buyerNotifications() : notifications();
       case 'profile':
         return profile();
       case 'saved':
-        return saved();
+        return savedDirectory();
+      case 'supplier':
+        return supplierHub();
+      case 'reorder':
+        return repeatPurchase();
+      case 'review':
+        return reviewOrder();
+      case 'government':
+        return governmentMarketplace();
       case 'channels':
         return channels();
       case 'help':
@@ -310,6 +339,26 @@ class _CommerceScreenState extends ConsumerState<CommerceScreen> {
             action: CraftButton(t('Go home', 'होम पर जाएँ'),
                 onPressed: () => context.go('/dashboard')))
       ];
+
+  int get _bidCount => ref
+      .watch(biddingProvider(
+          ref.watch(sessionProvider).account?.id ?? 'signed-out'))
+      .sessions
+      .where((s) => s['status'] == 'live')
+      .length;
+
+  List<Widget> bidding() => [BiddingPanel(initialSessionId: widget.id)];
+
+  Widget biddingSummary() => CraftCard(
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        title('Bulk Bidding Hub', 'बल्क बोली केंद्र'),
+        Text(t('Schedule your stock, review sealed offers and choose buyers.',
+            'अपने स्टॉक का सत्र तय करें, गुप्त ऑफ़र देखें और खरीदार चुनें।')),
+        CraftButton(t('View bidding sessions', 'बोली सत्र देखें'),
+            onPressed: () => go('bidding')),
+      ]));
+
   Widget title(String en, String hi, [String? sub]) =>
       CraftHeading(t(en, hi), subtitle: sub);
   Widget tile(String en, String hi, String sub, IconData icon, VoidCallback tap,
@@ -336,31 +385,48 @@ class _CommerceScreenState extends ConsumerState<CommerceScreen> {
                               fontSize: 10, color: Color(0xFF6E796F)))
                     ]
                   ])));
-  Widget stat(String label, int count, VoidCallback tap) => Expanded(
-      child: InkWell(
-          onTap: tap,
-          child: Container(
-              margin: const EdgeInsets.only(right: 6),
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                  color: const Color(0xFFF1F2EE),
-                  borderRadius: BorderRadius.circular(10)),
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: Alignment.centerLeft,
-                        child:
-                            Text(label, style: const TextStyle(fontSize: 9))),
-                    const SizedBox(height: 6),
-                    Text('$count',
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w700, fontSize: 22)),
-                    Text(t('View activity', 'गतिविधि देखें'),
-                        style: const TextStyle(
-                            fontSize: 8, color: Color(0xFF48745B)))
-                  ]))));
+
+  /// Home summary tile. [sub] replaces the default "View activity" caption, and
+  /// [live] adds the small status dot the Bidding tile carries.
+  Widget stat(String label, int count, VoidCallback tap,
+          {String? sub, bool live = false}) =>
+      Expanded(
+          child: InkWell(
+              onTap: tap,
+              child: Container(
+                  margin: const EdgeInsets.only(right: 6),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                      color: const Color(0xFFF1F2EE),
+                      borderRadius: BorderRadius.circular(10)),
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(children: [
+                          Flexible(
+                              child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(label,
+                                      style: const TextStyle(fontSize: 9)))),
+                          if (live) ...[
+                            const SizedBox(width: 4),
+                            Container(
+                                width: 7,
+                                height: 7,
+                                decoration: const BoxDecoration(
+                                    color: Color(0xFF3E9B58),
+                                    shape: BoxShape.circle))
+                          ]
+                        ]),
+                        const SizedBox(height: 6),
+                        Text('$count',
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w700, fontSize: 22)),
+                        Text(sub ?? t('View activity', 'गतिविधि देखें'),
+                            style: const TextStyle(
+                                fontSize: 8, color: Color(0xFF48745B)))
+                      ]))));
   List<Widget> home() {
     final buyer = repo.role == 'buyer';
     return [
@@ -420,15 +486,18 @@ class _CommerceScreenState extends ConsumerState<CommerceScreen> {
           CraftButton(
               t('Complete business verification', 'व्यवसाय सत्यापन पूरा करें'),
               secondary: true,
-              onPressed: () => go('profile')),
-        InkWell(
-            onTap: () => go('discover'),
-            child: const IgnorePointer(
-                child: TextField(
-                    decoration: InputDecoration(
-                        hintText: 'Search products, artisans…',
-                        prefixIcon: Icon(Icons.search),
-                        fillColor: Colors.white)))),
+              onPressed: () => context.push('/verification')),
+        TextField(
+            controller: search,
+            textInputAction: TextInputAction.search,
+            onSubmitted: (_) => go('discover', search.text.trim()),
+            decoration: InputDecoration(
+                hintText:
+                    t('Search products, artisans…', 'उत्पाद, कारीगर खोजें…'),
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: IconButton(
+                    icon: const Icon(Icons.arrow_forward),
+                    onPressed: () => go('discover', search.text.trim())))),
         const SizedBox(height: 16),
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Expanded(
@@ -449,7 +518,12 @@ class _CommerceScreenState extends ConsumerState<CommerceScreen> {
         const SizedBox(height: 18),
         title('Your activity', 'आपकी गतिविधि'),
         Row(children: [
-          stat(t('Requirements', 'ज़रूरतें'), repo.table('requirements').length,
+          stat(
+              t('Requirements', 'ज़रूरतें'),
+              repo
+                  .table('requirements')
+                  .where((r) => r['buyer_id'] == repo.actor)
+                  .length,
               () => go('requirements')),
           stat(
               t('Quotes', 'भाव'),
@@ -458,26 +532,48 @@ class _CommerceScreenState extends ConsumerState<CommerceScreen> {
                   .length,
               () => go('quotes')),
           stat(t('Orders', 'ऑर्डर'), repo.orders.length, () => go('orders')),
-          stat(t('Suppliers', 'आपूर्तिकर्ता'),
-              (repo.state['saved'] as List).length, () => go('saved'))
+          stat(t('Suppliers', 'आपूर्तिकर्ता'), savedProfiles.length,
+              () => go('saved'))
         ]),
+        const SizedBox(height: 12),
+        CraftButton(t('Bidding sessions', 'बोली सत्र'),
+            secondary: true,
+            icon: Icons.gavel_outlined,
+            onPressed: () => go('bidding')),
+        CraftButton(t('Saved suppliers', 'सहेजे आपूर्तिकर्ता'),
+            secondary: true,
+            icon: Icons.bookmark_outline,
+            onPressed: () => go('saved')),
       ] else ...[
         Row(children: [
           stat(t('Products', 'उत्पाद'), repo.products.length,
               () => go('products')),
+          stat(t('Bidding', 'बोली'), _bidCount, () => go('bidding'),
+              sub: t('Live Sessions', 'लाइव सत्र'), live: _bidCount > 0),
           stat(t('Inquiries', 'पूछताछ'), repo.inquiries.length,
               () => go('inquiries')),
           stat(t('Orders', 'ऑर्डर'), repo.orders.length, () => go('orders'))
         ]),
-        CraftButton(t('Add a product', 'उत्पाद जोड़ें'),
-            icon: Icons.add_a_photo_outlined,
-            onPressed: () => context.push('/workspace/create')),
-        title(
-            'My Products',
-            'मेरे उत्पाद',
-            t('Save first. Publish when you are ready.',
-                'पहले सहेजें। तैयार होने पर प्रकाशित करें।')),
-        ...repo.products.take(3).map(productCard),
+        const SizedBox(height: 14),
+        Row(children: [
+          Expanded(
+              flex: 3,
+              child: CraftButton(t('Add a product', 'उत्पाद जोड़ें'),
+                  icon: Icons.add,
+                  expand: false,
+                  onPressed: () => context.push('/workspace/create'))),
+          const SizedBox(width: 10),
+          Expanded(
+              flex: 4,
+              child: CraftButton(t('Host Bidding', 'बोली शुरू करें'),
+                  secondary: true,
+                  icon: Icons.gavel_outlined,
+                  expand: false,
+                  onPressed: () => go('bidding')))
+        ]),
+        const SizedBox(height: 6),
+        biddingSummary(),
+        ...repo.products.take(2).map(productCard),
       ],
       const SizedBox(height: 16),
       title('Explore more', 'और देखें'),
@@ -492,7 +588,7 @@ class _CommerceScreenState extends ConsumerState<CommerceScreen> {
                 t('Readiness & guided preparation', 'तैयारी और मार्गदर्शन'),
                 style: const TextStyle(fontSize: 10)),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () => go('channels')),
+            onTap: () => go(buyer ? 'government' : 'channels')),
         const Divider(),
         ListTile(
             contentPadding: EdgeInsets.zero,
@@ -583,7 +679,62 @@ class _CommerceScreenState extends ConsumerState<CommerceScreen> {
                               : (p['gaps'] as List).join(' · '),
                           style: const TextStyle(fontSize: 10)))
                 ])
-              ]
+              ],
+              // ── Artisan quick-action buttons ────────────────────────
+              if (repo.role == 'artisan' && !select) ...[
+                const SizedBox(height: 10),
+                Row(children: [
+                  // Left button: View (published) or Edit (draft)
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => p['status'] == 'published'
+                          ? go('product', '${p['id']}')
+                          : context.push('/workspace/create/${p['id']}'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        side: const BorderSide(color: Color(0xFF285448)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
+                      ),
+                      child: Text(
+                        p['status'] == 'published'
+                            ? t('View', 'देखें')
+                            : t('Edit', 'संपादित'),
+                        style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF285448)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // Right button: Update (published) or Publish (draft)
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => p['status'] == 'published'
+                          ? context.push('/workspace/create/${p['id']}')
+                          : action('publish', {'id': p['id']},
+                              success:
+                                  t('Product published', 'उत्पाद प्रकाशित')),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        backgroundColor: const Color(0xFF285448),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
+                      ),
+                      child: Text(
+                        p['status'] == 'published'
+                            ? t('Update', 'अपडेट')
+                            : t('Publish', 'प्रकाशित'),
+                        style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white),
+                      ),
+                    ),
+                  ),
+                ]),
+              ],
             ])));
   }
 
@@ -602,6 +753,12 @@ class _CommerceScreenState extends ConsumerState<CommerceScreen> {
                 .contains(search.text.toLowerCase()) &&
             (category == 'All' || p['category'] == category) &&
             (location == 'All' || p['location'] == location) &&
+            (priceBand == 'All' ||
+                (priceBand == 'Under ₹500' && number(p['price']) < 500) ||
+                (priceBand == '₹500–₹2,000' &&
+                    number(p['price']) >= 500 &&
+                    number(p['price']) <= 2000) ||
+                (priceBand == 'Above ₹2,000' && number(p['price']) > 2000)) &&
             (!verifiedOnly ||
                 repo.lookup(
                         'profiles', '${p['artisan_id']}')?['verification'] ==
@@ -616,6 +773,8 @@ class _CommerceScreenState extends ConsumerState<CommerceScreen> {
         .table('profiles')
         .where((p) =>
             p['role'] == 'artisan' &&
+            (category == 'All' || p['craft'] == category) &&
+            (location == 'All' || p['location'] == location) &&
             '${p['name']} ${p['craft']}'
                 .toLowerCase()
                 .contains(search.text.toLowerCase()) &&
@@ -644,23 +803,49 @@ class _CommerceScreenState extends ConsumerState<CommerceScreen> {
       const SizedBox(height: 12),
       Wrap(spacing: 8, runSpacing: 8, children: [
         filter(
-            'Category',
+            artisanList ? t('Craft', 'शिल्प') : t('Category', 'श्रेणी'),
             category,
-            ['All', 'Baskets', 'Pottery', 'Textiles', 'Woodcraft', 'Other'],
+            [
+              'All',
+              ...(artisanList
+                      ? repo
+                          .table('profiles')
+                          .where((p) => p['role'] == 'artisan')
+                          .map((p) => '${p['craft'] ?? ''}')
+                      : repo
+                          .table('products')
+                          .map((p) => '${p['category'] ?? ''}'))
+                  .where((v) => v.isNotEmpty)
+                  .toSet()
+            ],
             (v) => category = v),
         filter(
             'Location',
             location,
             [
               'All',
-              ...repo.table('products').map((p) => '${p['location']}').toSet()
+              ...(artisanList
+                      ? repo
+                          .table('profiles')
+                          .where((p) => p['role'] == 'artisan')
+                      : repo.table('products'))
+                  .map((p) => '${p['location'] ?? ''}')
+                  .where((v) => v.isNotEmpty)
+                  .toSet()
             ],
             (v) => location = v),
-        filter(
-            'Sort',
-            sort,
-            ['Recommended', 'Lowest price', 'Fastest delivery'],
-            (v) => sort = v),
+        if (!artisanList)
+          filter(
+              t('Price', 'मूल्य'),
+              priceBand,
+              ['All', 'Under ₹500', '₹500–₹2,000', 'Above ₹2,000'],
+              (v) => priceBand = v),
+        if (!artisanList)
+          filter(
+              'Sort',
+              sort,
+              ['Recommended', 'Lowest price', 'Fastest delivery'],
+              (v) => sort = v),
         FilterChip(
             label: Text(t('Verified only', 'केवल सत्यापित'),
                 style: const TextStyle(fontSize: 11)),
@@ -691,15 +876,19 @@ class _CommerceScreenState extends ConsumerState<CommerceScreen> {
                   DetailRow(
                       t('Experience', 'अनुभव'), '${p['experience']} years'),
                   Text('${p['story']}', style: const TextStyle(fontSize: 12)),
-                  CraftButton(t('View products', 'उत्पाद देखें'),
+                  CraftButton(t('View supplier', 'आपूर्तिकर्ता देखें'),
                       secondary: true, onPressed: () {
-                    final ps = repo.table('products').where((v) =>
-                        v['artisan_id'] == p['id'] &&
-                        v['status'] == 'published');
-                    if (ps.isNotEmpty) go('product', '${ps.first['id']}');
+                    go('supplier', '${p['id']}');
                   }),
                   if (repo.role == 'buyer')
-                    CraftButton(t('Save supplier', 'आपूर्तिकर्ता सहेजें'),
+                    CraftButton(
+                        t(
+                            savedSupplier('${p['id']}')
+                                ? 'Remove saved supplier'
+                                : 'Save supplier',
+                            savedSupplier('${p['id']}')
+                                ? 'सहेजी सूची से हटाएँ'
+                                : 'आपूर्तिकर्ता सहेजें'),
                         onPressed: () =>
                             action('save_supplier', {'artisan_id': p['id']}))
                 ])))
@@ -824,6 +1013,9 @@ class _CommerceScreenState extends ConsumerState<CommerceScreen> {
         CraftButton(t('External channel readiness', 'बाहरी चैनल तैयारी'),
             secondary: true, onPressed: () => go('channels', '${p['id']}')),
       ] else if (repo.role == 'buyer') ...[
+        CraftButton(t('View supplier profile', 'आपूर्तिकर्ता की प्रोफ़ाइल'),
+            secondary: true,
+            onPressed: () => go('supplier', '${p['artisan_id']}')),
         CraftButton(t('Send inquiry / RFQ', 'पूछताछ भेजें'),
             onPressed: p['available'] == true && !repo.busy
                 ? () => sendInquiry(p)
@@ -844,18 +1036,29 @@ class _CommerceScreenState extends ConsumerState<CommerceScreen> {
         const [
           CraftField('original', 'Describe what you need (type or speak)',
               'क्या चाहिए? लिखें या बोलें',
-              required: true, multiline: true)
+              multiline: true),
+          CraftField('reference_image', 'Reference image / design (optional)',
+              'संदर्भ फ़ोटो / डिज़ाइन (वैकल्पिक)'),
         ],
-        initial: {'original': initial['original'] ?? ''},
+        initial: {
+          'original': initial['original'] ?? '',
+          'reference_image': initial['reference_image'] ?? ''
+        },
         description: t(
             'Your words stay attached to the request. You review every structured field.',
             'आपकी बात सुरक्षित रहेगी। हर विवरण जाँचें।'),
         button: t('Structure & review', 'विवरण जाँचें'));
     if (raw == null || !mounted) return;
-    final text = '${raw['original']}';
+    final text = '${raw['original'] ?? ''}'.trim();
+    if (text.isEmpty && '${raw['reference_image'] ?? ''}'.trim().isEmpty) {
+      toast(t('Describe your requirement or attach a reference image.',
+          'अपनी ज़रूरत बताएँ या संदर्भ फ़ोटो जोड़ें।'));
+      return;
+    }
     Record assisted = {'fields': {}, 'provenance': 'Manual review'};
     try {
-      assisted = await repo.assist('requirement', text, t('en', 'hi'));
+      if (text.isNotEmpty)
+        assisted = await repo.assist('requirement', text, t('en', 'hi'));
     } catch (e) {
       toast('$e');
     }
@@ -1427,7 +1630,8 @@ class _CommerceScreenState extends ConsumerState<CommerceScreen> {
               multiline: true),
         ],
         initial: {
-          'unit_price': p['price'],
+          'unit_price':
+              r['bidding_session_id'] != null ? r['budget'] : p['price'],
           'quantity': r['confirmed_quantity'] ?? r['quantity'],
           'lead_days': r['offered_lead_days'] ?? r['lead_days'],
           'location': r['location'],
@@ -1469,7 +1673,9 @@ class _CommerceScreenState extends ConsumerState<CommerceScreen> {
             'आपके ऑर्डर',
             t('Know the next step. Keep every commitment visible.',
                 'अगला कदम जानें। हर वादा साफ़ रखें।')),
-        if (repo.orders.isEmpty)
+        if (repo.orders
+            .where((o) => widget.id == null || o['artisan_id'] == widget.id)
+            .isEmpty)
           EmptyCraft(
               t('No orders yet', 'अभी कोई ऑर्डर नहीं'),
               t('An accepted quotation becomes your first order.',
@@ -1511,6 +1717,7 @@ class _CommerceScreenState extends ConsumerState<CommerceScreen> {
     final route = CommerceEngine.route(
         p, {'quantity': o['quantity'], 'location': o['location']});
     return [
+      if (buyer && o['status'] == 'completed') ...completedActions(o),
       title('${o['product_title']}', '${o['product_title']}',
           '${o['quantity']} units · ${supplier(o['artisan_id'])}'),
       CraftCard(
@@ -1818,26 +2025,6 @@ class _CommerceScreenState extends ConsumerState<CommerceScreen> {
                         'status': 'confirmed'
                       }))
           ]),
-      if (buyer && o['status'] == 'completed') ...[
-        CraftButton(t('Save supplier', 'आपूर्तिकर्ता सहेजें'),
-            onPressed: () =>
-                action('save_supplier', {'artisan_id': o['artisan_id']})),
-        CraftButton(
-            t('Reorder · create a new requirement',
-                'फिर ऑर्डर · नई ज़रूरत बनाएँ'),
-            secondary: true,
-            onPressed: () => newRequirement(initial: {
-                  'product': o['product_title'],
-                  'quantity': o['quantity'],
-                  'lead_days': o['lead_days'],
-                  'location': o['location'],
-                  'customization': o['customization'],
-                  'budget': o['unit_price'],
-                  'source_order_id': o['id'],
-                  'original':
-                      '${o['quantity']} ${o['product_title']} in ${o['lead_days']} days'
-                }))
-      ],
       ExpansionTile(
           title: Text(t('Order history & evidence', 'ऑर्डर इतिहास और प्रमाण'),
               style: const TextStyle(fontSize: 13)),
@@ -2015,6 +2202,16 @@ class _CommerceScreenState extends ConsumerState<CommerceScreen> {
         if (!isArtisan)
           DetailRow(t('Business', 'व्यवसाय'),
               account?.businessName ?? account?.industry ?? '—'),
+        if (!isArtisan) ...[
+          DetailRow(t('Business type', 'व्यवसाय का प्रकार'),
+              account?.businessType ?? '—'),
+          DetailRow(t('Industry / category', 'उद्योग / श्रेणी'),
+              account?.industry ?? '—'),
+          DetailRow(t('Work email', 'कार्य ईमेल'),
+              '${account?.profile['work_email'] ?? ''}'),
+          DetailRow(
+              t('Website', 'वेबसाइट'), '${account?.profile['website'] ?? ''}'),
+        ],
         DetailRow(t('Location', 'स्थान'), location.isEmpty ? '—' : location),
         DetailRow(t('Contact', 'संपर्क'), contact),
       ])),
@@ -2062,31 +2259,6 @@ class _CommerceScreenState extends ConsumerState<CommerceScreen> {
     ];
   }
 
-  List<Widget> saved() => [
-        title('Saved suppliers', 'सहेजे आपूर्तिकर्ता'),
-        ...repo
-            .table('profiles')
-            .where((p) => (repo.state['saved'] as List)
-                .contains('${repo.actor}:${p['id']}'))
-            .map((p) => CraftCard(
-                    child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                      Text('${p['name']}',
-                          style: const TextStyle(fontWeight: FontWeight.w600)),
-                      Text('${p['location']}',
-                          style: const TextStyle(fontSize: 11)),
-                      CraftButton(
-                          t('Order history & reorder',
-                              'ऑर्डर इतिहास और फिर खरीदें'),
-                          onPressed: () => go('orders', '${p['id']}')),
-                      CraftButton(
-                          t('Remove saved supplier', 'सहेजी सूची से हटाएँ'),
-                          secondary: true,
-                          onPressed: () =>
-                              action('save_supplier', {'artisan_id': p['id']}))
-                    ])))
-      ];
   List<Widget> channels() {
     final p = repo.lookup('products', widget.id);
     return [

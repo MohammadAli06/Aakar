@@ -172,6 +172,12 @@ void main() {
       'create',
       'profile',
       'notifications',
+      'saved',
+      'supplier/ramesh',
+      'government',
+      'review/test-order',
+      'reorder/test-order',
+      'order/completed-order',
       'channels/basket',
       'help'
     ]) {
@@ -181,8 +187,18 @@ void main() {
         tester.view.devicePixelRatio = 1;
         addTearDown(tester.view.resetPhysicalSize);
         addTearDown(tester.view.resetDevicePixelRatio);
+        final pageState = fixture();
+        if (page.startsWith('review/') ||
+            page.startsWith('reorder/') ||
+            page == 'order/completed-order') {
+          final order = (pageState['orders'] as List).first as Map;
+          order['status'] = 'completed';
+          order['buyer_id'] = 'buyer-test';
+          if (page == 'order/completed-order') order['id'] = 'completed-order';
+        }
+        pageState['saved'] = ['buyer-test:ramesh'];
         SharedPreferences.setMockInitialValues({
-          'commerce_state_v1': jsonEncode(fixture()),
+          'commerce_state_v1': jsonEncode(pageState),
           'commerce_role': 'buyer'
         });
         final container = ProviderContainer(overrides: [

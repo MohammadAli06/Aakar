@@ -236,7 +236,8 @@ class CommerceEngine {
       if (p[key] is! bool) missing.add(key);
     }
     if (p['approved'] != true) missing.add('artisan approval');
-    if (const ['gemini', 'openai'].contains(p['photo_provider']) &&
+    if (const ['gemini', 'openai', 'cloudinary']
+            .contains(p['photo_provider']) &&
         p['photo_reviewed'] != true) {
       missing.add('photo review');
     }
@@ -1032,12 +1033,45 @@ class CommerceEngine {
         break;
       case 'save_supplier':
         asRole('buyer');
+        require(find('profiles', input['artisan_id'])['role'] == 'artisan',
+            'Choose an artisan supplier');
         final key = '$actor:${input['artisan_id']}';
         if (list('saved').contains(key)) {
           list('saved').remove(key);
         } else {
           list('saved').add(key);
         }
+        break;
+      case 'review_order':
+        asRole('buyer');
+        final o = order();
+        require(o['status'] == 'completed',
+            'Complete delivery and inspection before reviewing');
+        final rating = number(input['rating']);
+        final text = '${input['text'] ?? ''}'.trim();
+        final tags = (input['tags'] as List? ?? []).map((e) => '$e').toSet();
+        require(rating >= 1 && rating <= 5 && rating == rating.roundToDouble(),
+            'Choose 1 to 5 stars');
+        require(text.length <= 500, 'Review must be 500 characters or fewer');
+        require(
+            tags.every(const {
+              'Product quality',
+              'Communication',
+              'Timely delivery',
+              'Packaging',
+              'Professionalism',
+              'Value for money'
+            }.contains),
+            'Unknown review tag');
+        o['review'] = {
+          'rating': rating.toInt(),
+          'text': text,
+          'tags': tags.toList(),
+          'buyer_id': actor,
+          'time': now
+        };
+        notify('Buyer review received', '${o['artisan_id']}', 'artisan',
+            'order/${o['id']}');
         break;
       case 'representation':
         final o = order();

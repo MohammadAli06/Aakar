@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.auth_deps import get_current_user, require_artisan, require_buyer
 from app.core.database import get_db
 from app.core.firebase_auth import set_role_claim, verify_firebase_token
-from app.models.models import AccountRole, AccountVerification, Artisan, Buyer, CraftCategory, User
+from app.models.models import AccountRole, AccountVerification, Artisan, Buyer, BuyerContact, CraftCategory, User
 
 router = APIRouter()
 
@@ -30,6 +30,8 @@ class ArtisanProfilePayload(ProfilePayload):
 
 
 class BuyerProfilePayload(ProfilePayload):
+    work_email: Optional[str] = Field(default=None, max_length=320, pattern=r'^$|^[^@\s]+@[^@\s]+\.[^@\s]+$')
+    website: Optional[str] = Field(default=None, max_length=500, pattern=r'^$|^https?://[^/\s?#]+(?:[/?#][^\s]*)?$')
     name: Optional[str] = Field(default=None, min_length=1, max_length=200)
     language_pref: Optional[str] = Field(default=None, pattern='^(en|hi)$')
     business_name: Optional[str] = Field(default=None, min_length=1, max_length=200)
@@ -86,6 +88,9 @@ async def _account_payload(
     else:
         result = await db.execute(select(Buyer).where(Buyer.user_id == user.id))
         profile = _buyer_profile(result.scalar_one_or_none())
+        contact = await db.get(BuyerContact, user.id)
+        if profile is not None:
+            profile.update(work_email=contact.work_email if contact else '', website=contact.website if contact else '')
 
     return AccountResponse(
         id=user.id,
@@ -181,12 +186,12 @@ async def select_role(data: RolePayload, user: User = Depends(get_current_user),
     return await _account_payload(db, user)
 
 
-async def invalidate_review(db, user, data, profile):
+async def invalidate_review(db, user, data, profile, extras=None):
     """Material profile corrections require a fresh review of the affected role."""
     changes = data.model_dump(exclude_none=True)
     name_changed = 'name' in changes and changes['name'] != user.name
     changed = name_changed or any(
-        key not in ('name', 'language_pref') and value != getattr(profile, key, None)
+        key not in ('name', 'language_pref') and value != (extras[key] if extras and key in extras else getattr(profile, key, None))
         for key, value in changes.items())
     if not changed:
         return
@@ -258,7 +263,17 @@ async def update_buyer_profile(
         buyer = Buyer(user_id=user.id)
         db.add(buyer)
 
-    await invalidate_review(db, user, data, buyer)
+    contact = await db.get(BuyerContact, user.id)
+    await invalidate_review(db, user, data, buyer, {
+        'work_email': contact.work_email if contact else '', 'website': contact.website if contact else ''})
+    if data.work_email is not None or data.website is not None:
+        if contact is None:
+            contact = BuyerContact(user_id=user.id)
+            db.add(contact)
+        if data.work_email is not None:
+            contact.work_email = data.work_email
+        if data.website is not None:
+            contact.website = data.website
     if data.name is not None:
         user.name = data.name
     if data.language_pref is not None:

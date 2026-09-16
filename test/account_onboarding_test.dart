@@ -125,9 +125,18 @@ void main() {
       await tester.tap(destinations.at(1));
       await tester.pumpAndSettle();
       expect(find.byType(NavigationBar), findsOneWidget);
-      await tester.tap(destinations.last);
+      // Profile left the bottom bar; the app bar avatar is the way in now, and the
+      // bar itself must not offer a Profile destination any more.
+      expect(
+          find.descendant(
+              of: find.byType(NavigationBar), matching: find.text('Profile')),
+          findsNothing);
+      await tester.tap(find.byTooltip('Your profile'));
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('View verification'));
+      await Scrollable.ensureVisible(
+          tester.element(find.text('View verification')),
+          alignment: .5);
+      await tester.pumpAndSettle();
       await tester.tap(find.text('View verification'));
       await tester.pumpAndSettle();
       expect(find.text('You’re verified!'), findsOneWidget);

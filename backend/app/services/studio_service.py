@@ -7,11 +7,13 @@ import base64
 import binascii
 import io
 import json
+import re
 
 import httpx
 from PIL import Image, ImageChops, ImageOps, ImageStat, UnidentifiedImageError
 
 from app.core.config import settings
+from app.services import ai_provider, cloudinary_service
 
 MAX_BYTES = 12 * 1024 * 1024
 MAX_PIXELS = 24_000_000
@@ -60,6 +62,8 @@ than inventing values or writing unknown/N/A placeholders. If there is no clear
 product or several unrelated objects, return no fields and ask for a clearer photo.
 For each suggestion include confidence (high/medium/low), source (image/artisan),
 and concise evidence. These confidence labels are estimates, not probabilities.
+For EVERY source=artisan suggestion, evidence must be an exact excerpt copied
+from the notes, without labels, commentary or surrounding quotation marks.
 Only high-confidence suggestions will be prefilled. Ask up to three short relevant
 questions for missing material, measurements or ambiguous details. Questions should
 use the requested language. Never add keys outside the schema.
@@ -72,7 +76,7 @@ class StudioError(Exception):
         self.status = status
 
 
-def decode_photo(data):
+def decode_photo(data, preserve_alpha=False):
     if not data or len(data) > MAX_BYTES:
         raise StudioError('Choose a photo smaller than 12 MB.', 413)
     try:
@@ -85,7 +89,7 @@ def decode_photo(data):
             oriented = ImageOps.exif_transpose(image).convert('RGBA')
             white = Image.new('RGBA', oriented.size, 'white')
             white.alpha_composite(oriented)
-            result = white.convert('RGB')
+            result = oriented if preserve_alpha else white.convert('RGB')
             result.thumbnail((1600, 1600), Image.Resampling.LANCZOS)
             return result
     except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError):
@@ -174,6 +178,20 @@ async def edit_photo(image, prompt):
 
 
 async def recognize_catalog(image, prompt):
+    if ai_provider.selected_provider() in ('openrouter', 'gemini'):
+        try:
+            raw = await ai_provider.chat([
+                {'role': 'system', 'content': CATALOG_PROMPT + '\nReturn JSON matching this schema: ' + json.dumps(catalog_schema())},
+                {'role': 'user', 'content': [
+                    {'type': 'text', 'text': prompt},
+                    {'type': 'image_url', 'image_url': {'url': 'data:image/jpeg;base64,' + base64.b64encode(encode_photo(image)).decode('ascii')}},
+                ]},
+            ], json_mode=True)
+            return ai_provider.parse_json(raw)
+        except ai_provider.ProviderError as exc:
+            raise StudioError(str(exc), exc.status) from None
+        except (ValueError, TypeError):
+            raise StudioError(f'{ai_provider.selected_provider()} returned no usable catalog suggestions. Retry or enter details manually.') from None
     result = await request_openai('responses', json={
         'model': settings.OPENAI_VISION_MODEL, 'store': False,
         'instructions': CATALOG_PROMPT,
@@ -207,16 +225,34 @@ async def prepare(data, mode, catalog_plain_background=True):
     image = decode_photo(data)
     generative = mode == 'plainBackground' or (mode == 'b2bCatalog' and catalog_plain_background)
     if generative:
-        image = await edit_photo(image, PLAIN_PROMPT)
+        if ai_provider.background_provider() == 'cloudinary':
+            try:
+                image = decode_photo(await cloudinary_service.remove_background(encode_photo(image)), preserve_alpha=True)
+            except ai_provider.ProviderError as exc:
+                raise StudioError(str(exc), exc.status) from None
+        else:
+            image = await edit_photo(image, PLAIN_PROMPT)
     elif mode == 'naturalSetting':
         image = natural_photo(image)
     elif mode != 'b2bCatalog':
         raise StudioError('Unknown photo preparation option.', 422)
     if mode == 'b2bCatalog':
+        if image.mode == 'RGBA':
+            white = Image.new('RGBA', image.size, 'white')
+            white.alpha_composite(image)
+            image = white.convert('RGB')
         image = catalog_frame(image, trim_white=generative)
-    return {'image_base64': base64.b64encode(encode_photo(image)).decode('ascii'),
-            'mime_type': 'image/jpeg', 'width': image.width, 'height': image.height,
-            'provider': 'openai' if generative else 'deterministic',
+    mime = 'image/jpeg'
+    if image.mode == 'RGBA':
+        stream = io.BytesIO()
+        image.save(stream, 'PNG')
+        encoded = stream.getvalue()
+        mime = 'image/png'
+    else:
+        encoded = encode_photo(image)
+    return {'image_base64': base64.b64encode(encoded).decode('ascii'),
+            'mime_type': mime, 'width': image.width, 'height': image.height,
+            'provider': ai_provider.background_provider() if generative else 'deterministic',
             'review_required': generative, 'mode': mode}
 
 
@@ -258,8 +294,10 @@ def filter_catalog(result, notes):
         source = suggestion.get('source')
         if not value or not reason or source not in ('image', 'artisan'):
             continue
-        if source == 'artisan' and reason.casefold() not in notes.casefold():
-            continue
+        if source == 'artisan':
+            reason = artisan_evidence(reason, notes)
+            if not reason:
+                continue
         if field == 'material' and source != 'artisan':
             continue
         if field == 'category' and value not in CATEGORIES:
@@ -270,7 +308,24 @@ def filter_catalog(result, notes):
         evidence[field] = {'source': source, 'reason': reason}
     questions = [q for raw in result.get('questions', []) if (q := clean_text(raw, 220))][:3]
     return {'fields': fields, 'evidence': evidence, 'questions': questions,
-            'provenance': 'OpenAI suggestions from original photo; artisan review required'}
+            'provenance': f'{ai_provider.selected_provider()} suggestions from original photo; artisan review required'}
+
+
+def artisan_evidence(reason, notes):
+    """Accept an exact notes excerpt, optionally wrapped by a provider label.
+
+    Never accept paraphrased or invented evidence; store only the matched quote.
+    """
+    normalized_notes = ' '.join(notes.split()).casefold()
+    candidates = [reason]
+    labeled = re.sub(r'^(?:artisan notes?|notes?|artisan said)\s*:\s*', '',
+                     reason, flags=re.IGNORECASE)
+    candidates.append(labeled.strip('"\'“”‘’'))
+    for candidate in candidates:
+        candidate = ' '.join(candidate.split())
+        if len(candidate) >= 2 and candidate.casefold() in normalized_notes:
+            return candidate
+    return ''
 
 
 async def analyze(data, notes='', language='en'):

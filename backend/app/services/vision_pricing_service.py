@@ -1,13 +1,13 @@
 """
-Vision Pricing Service — GPT-4.1-mini vision analysis for product craftsmanship assessment.
+Vision Pricing Service — selectable OpenAI/OpenRouter analysis for product craftsmanship assessment.
 
-Sends the product photo + description to OpenAI GPT vision to automatically assess:
+Sends the product photo + description to the selected vision provider to automatically assess:
   - craftsmanship_complexity (0.0–1.0)
   - detected craft category
   - material tier (low / medium / premium)
   - bilingual reasoning text shown to artisan in the UI
 
-Always returns a safe fallback dict if OpenAI is unavailable, times out, or returns
+Always returns a safe fallback dict if the selected provider is unavailable, times out, or returns
 unexpected output — so the pricing flow is never blocked by AI unavailability.
 """
 import base64
@@ -16,7 +16,7 @@ import logging
 import os
 from typing import Any, Dict
 
-from app.core.config import settings
+from app.services import ai_provider
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +72,7 @@ def _parse_response(text: str) -> Dict[str, Any]:
         "material_tier": str(data.get("material_tier", "medium")),
         "reasoning_en": str(data.get("reasoning_en", "")),
         "reasoning_hi": str(data.get("reasoning_hi", "")),
-        "model_used": settings.OPENAI_VISION_MODEL,
+        "model_used": ai_provider.transport()[2],
         "is_fallback": False,
     }
 
@@ -82,7 +82,7 @@ async def analyze_product_image(
     description: str = "",
 ) -> Dict[str, Any]:
     """
-    Call GPT-4.1-mini with the product image + description.
+    Call the selected vision model with the product image + description.
 
     Args:
         image_path: Absolute path to the product image on disk (may be None).
@@ -92,19 +92,7 @@ async def analyze_product_image(
         Dict with complexity_score, detected_category, material_tier,
         reasoning_en, reasoning_hi, model_used, is_fallback.
     """
-    api_key = settings.OPENAI_API_KEY
-    if not api_key:
-        logger.warning("OPENAI_API_KEY not set — returning fallback pricing analysis")
-        return _FALLBACK
-
     try:
-        from openai import AsyncOpenAI  # imported lazily — not required for startup
-
-        client = AsyncOpenAI(
-            api_key=api_key,
-            timeout=settings.OPENAI_TIMEOUT_SECONDS,
-        )
-
         # Build message content
         content: list = []
 
@@ -134,21 +122,10 @@ async def analyze_product_image(
             text_prompt += f"\n\nArtisan's description: {description.strip()}"
         content.append({"type": "text", "text": text_prompt})
 
-        if not content or all(c.get("type") == "text" for c in content):
-            # No image — use text-only prompt with description
-            logger.info("No product image available; using description-only analysis")
-
-        response = await client.chat.completions.create(
-            model=settings.OPENAI_VISION_MODEL,
-            messages=[
-                {"role": "system", "content": _SYSTEM_PROMPT},
-                {"role": "user", "content": content},
-            ],
-            max_tokens=300,
-            temperature=0.2,
-        )
-
-        raw = response.choices[0].message.content or ""
+        raw = await ai_provider.chat([
+            {"role": "system", "content": _SYSTEM_PROMPT},
+            {"role": "user", "content": content},
+        ], json_mode=True, max_tokens=1200)
         result = _parse_response(raw)
         logger.info(
             "Vision analysis complete: score=%.2f category=%s tier=%s",

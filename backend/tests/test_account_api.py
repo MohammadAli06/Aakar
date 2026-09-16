@@ -27,6 +27,22 @@ async def identity(token):
 
 
 class AccountApiTests(unittest.TestCase):
+    def test_buyer_business_contact_persists_without_changing_login(self):
+        self.register(self.alice, 'buyer')
+        self.register(self.bob, 'buyer')
+        data = {'work_email': 'orders@example.org', 'website': 'https://example.org/shop'}
+        response = self.client.put(self.base + '/buyer-profile', headers=self.alice, json=data)
+        self.assertEqual(response.status_code, 200, response.text)
+        response = self.client.get(self.base + '/me', headers=self.alice).json()
+        self.assertEqual(response['profile']['website'], data['website'])
+        self.assertEqual(response['profile']['work_email'], data['work_email'])
+        self.assertIsNone(response['email'])
+        self.assertEqual(self.client.get(self.base + '/me', headers=self.bob).json()['profile']['website'], '')
+        for fields in [{'website': 'javascript:alert(1)'}, {'work_email': 'not-email'}]:
+            self.assertEqual(self.client.put(self.base + '/buyer-profile', headers=self.alice, json=fields).status_code, 422)
+        response = self.client.put(self.base + '/buyer-profile', headers=self.alice, json={'website': ''})
+        self.assertEqual(response.json()['profile']['website'], '')
+
     def setUp(self):
         # The system temp directory, not the repo: writing inside backend/tests
         # is denied on Windows and the cleanup fails there too.

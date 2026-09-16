@@ -1,6 +1,10 @@
 """
 Pricing Router — Labour-aware, explainable pricing engine.
 """
+import base64
+import logging
+import os
+import tempfile
 import uuid
 from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException
@@ -18,8 +22,13 @@ from app.services.vision_pricing_service import analyze_product_image
 
 router = APIRouter()
 
-# Workspace media directory — same as workspace.py
-_WORKSPACE_MEDIA = Path(__file__).parents[2] / "uploads" / "workspace"
+logger = logging.getLogger(__name__)
+
+# Product photos are stored by products.py under this directory and referenced as
+# "/api/v1/products/images/<hash>.jpg". The workspace media directory is a different
+# store (workspace.py, ".../workspace/media/..."), so resolving product photos there
+# always missed and the vision call silently ran without an image.
+_PRODUCT_MEDIA = Path(__file__).parents[2] / "uploads" / "products"
 
 
 
@@ -205,12 +214,20 @@ async def analyze_image(
 
     image_path: str | None = None
     if product_image and product_image.original_url:
-        # original_url is like "/api/v1/workspace/media/<hash>.jpg"
-        # Extract just the filename to build the local disk path
+        # original_url is like "/api/v1/products/images/<hash>.jpg"; the filename is
+        # unguessable and unique, so the basename is enough to find it on disk.
         filename = product_image.original_url.rstrip("/").split("/")[-1]
-        candidate = _WORKSPACE_MEDIA / filename
-        if candidate.exists():
+        candidate = _PRODUCT_MEDIA / filename
+        if candidate.is_file():
             image_path = str(candidate)
+        else:
+            # Say so out loud: the analysis still succeeds, but the artisan gets a
+            # generic assessment instead of one grounded in their own photo.
+            logger.warning("task=pricing_vision product=%s photo_missing url=%s",
+                           data.product_id, product_image.original_url)
+    else:
+        logger.info("task=pricing_vision product=%s photo=none", data.product_id)
+
 
     # Fetch product description (listing desc_en) for richer analysis
     listing_result = await db.execute(
@@ -221,3 +238,64 @@ async def analyze_image(
 
     result = await analyze_product_image(image_path=image_path, description=description)
     return AnalyzeImageResponse(**result)
+
+
+# ── AI Vision Analysis (draft / unsaved products) ────────────────────────────
+
+class AnalyzeDraftRequest(BaseModel):
+    """Accepts raw image data + description for products not yet saved to DB."""
+    image_b64: Optional[str] = None   # base64-encoded image (data URI or raw)
+    description: str = ""             # artisan's voice description
+
+
+def _draft_image_path(image_b64: str) -> str:
+    """Write a draft's inline photo to a temp file for the vision service.
+
+    Raises ValueError when the payload is not decodable image data.
+    """
+    raw = image_b64.split(',', 1)[1] if ',' in image_b64 else image_b64
+    raw = raw.strip()
+    if not raw:
+        raise ValueError('empty image payload')
+    handle = tempfile.NamedTemporaryFile(delete=False, suffix='.jpg')
+    try:
+        handle.write(base64.b64decode(raw, validate=True))
+    except Exception:
+        handle.close()
+        os.unlink(handle.name)
+        raise
+    handle.close()
+    return handle.name
+
+
+@router.post("/analyze-draft", response_model=AnalyzeImageResponse)
+async def analyze_draft(
+    data: AnalyzeDraftRequest,
+    artisan: Artisan = Depends(require_artisan_profile),
+):
+    """
+    Analyze a product photo + description for a draft that hasn't been saved to DB yet.
+
+    Called by Product Studio's pricing step for brand-new products. The image arrives
+    as a base64 data URI. Returns the same response shape as /analyze-image.
+    """
+    image_path: str | None = None
+    if data.image_b64:
+        try:
+            image_path = _draft_image_path(data.image_b64)
+        except Exception:
+            # Undecodable payload: still answer, but honestly text-only.
+            logger.warning("analyze-draft: could not decode image_b64 — running text-only")
+    try:
+        result = await analyze_product_image(
+            image_path=image_path,
+            description=data.description,
+        )
+        return AnalyzeImageResponse(**result)
+    finally:
+        if image_path:
+            try:
+                os.unlink(image_path)
+            except OSError:
+                pass
+

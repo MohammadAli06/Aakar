@@ -67,7 +67,14 @@ class WorkspaceApiTests(unittest.TestCase):
         self.assertEqual(self.client.get(base, headers=mobile).json(), fresh)
 
     def test_assistant_fallback_and_admin_page(self):
-        response = self.client.post('/api/v1/workspace/assist', headers={'Authorization': 'Bearer test-mobile-only'}, json=dict(task='requirement', text='500 bamboo baskets in 30 days', language='en'))
+        # With no provider configured the assistant must degrade to the deterministic
+        # extractor rather than fail. Both keys are cleared so a developer's real .env
+        # cannot turn this into a live paid/free-tier call.
+        body = dict(task='requirement', text='500 bamboo baskets in 30 days', language='en')
+        with patch.object(settings, 'LLM_API_KEY', None), patch.object(
+                settings, 'OPENAI_API_KEY', None):
+            response = self.client.post('/api/v1/workspace/assist',
+                headers={'Authorization': 'Bearer test-mobile-only'}, json=body)
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.json()['ai'])
         self.assertEqual(response.json()['fields']['quantity'], 500)

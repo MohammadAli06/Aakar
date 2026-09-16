@@ -111,6 +111,14 @@ class Buyer(Base):
     user = relationship("User", back_populates="buyer_profile")
 
 
+class BuyerContact(Base):
+    """Optional business contact details, separate from login credentials."""
+    __tablename__ = 'buyer_contacts'
+    user_id = Column(String, ForeignKey('users.id'), primary_key=True)
+    work_email = Column(String(320), nullable=False, default='')
+    website = Column(String(500), nullable=False, default='')
+
+
 # ── Account verification ──────────────────────────────────────────────────
 class AccountVerification(Base):
     __tablename__ = "account_verifications"

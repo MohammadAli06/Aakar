@@ -1,5 +1,9 @@
 # Repository context
 
+**Buyer flow update, 2026-09-17:** The buyer reference now has supplier relationship pages, working discovery filters, account-filtered activity, categorized notices, completion/review and a three-step fresh-RFQ reorder. Business work email/site persist in a new account-owned contact table. Existing OTP, commerce-demo and payment/logistics boundaries remain. See [full reference coverage](BUYER_FLOW.md).
+
+**Bidding scope update, 2026-09-17:** The user explicitly requested the full reference flow, superseding the earlier deferred/sample-only bidding scope. Account-owned sessions, sealed offers, verified requirement matching, schedule management, allocation and persistent quotation handoff now replace the sample lot. Downstream quotation/order edits retain the existing local-demo boundary. See [Bidding flow and 14-step checklist](BIDDING_FLOW.md).
+
 Latest correction: registered phone numbers keep their existing artisan/buyer role; only new accounts see role selection. Role switching has been removed from account home and is rejected by the backend. Profile setup now has a back button to phone entry; profile editing returns home.
 
 Account lookup uses the verified Firebase UID to SELECT the user and stored role profile. It never rewrites roles or guesses from profile rows. The temporary role-reconciliation proposal was reverted; the developer cleared the inconsistent account data. No live database repair is part of the current fix.
@@ -9,6 +13,21 @@ Account lookup uses the verified Firebase UID to SELECT the user and stored role
 Updated 2026-09-11. Read [Updated architecture](UPDATED_ARCHITECTURE.md) for scope and [Implemented workflows](IMPLEMENTED_WORKFLOWS.md) for the current feature map, setup and limitations. [Original implementation baseline](REPOSITORY_BASELINE.md) preserves the earlier inspection; its missing-feature statements are historical.
 
 ## Current application
+
+**Gemini 503 handling:** a minimal direct Gemini request reproduced HTTP 503. The adapter now retries Gemini 503s at most twice within the total request deadline, respects retry hints, leaves Gemini temperature at its default, and preserves persistent 503s through Studio instead of converting them to 502. All 48 provider/Studio/translation tests pass. Live extraction recovery remains unconfirmed; see [provider setup and troubleshooting](AI_PROVIDERS.md).
+
+**Third AI profile, 2026-09-16:** `cloudinary_gemini` keeps Cloudinary removal and routes catalog, pricing and translation QA directly to Google using `GEMINI_API_KEY` and `GEMINI_MODEL=gemini-3.8-flash`. It bypasses OpenRouter and has no automatic provider fallback. The original two profiles and Groq services remain available. All 45 provider/Studio/translation checks pass; Gemini live access remains unvalidated without a key. [Configuration](AI_PROVIDERS.md#third-option-cloudinary--direct-gemini).
+
+**OpenRouter diagnostics, 2026-09-16:** a live key check showed unused daily free quota while Gemma returned upstream Google AI Studio HTTP 429. Provider errors now distinguish upstream limiting, recognized daily caps and credit errors and display numeric retry hints. No automatic retries/model switches were added. All 42 provider/Studio/translation tests pass with OpenAI fixtures explicitly isolated from the selected local profile. See [provider troubleshooting](AI_PROVIDERS.md#rate-limit-troubleshooting).
+
+**Selectable Studio providers, 2026-09-16:** `AI_PROVIDER_PROFILE=openai|cloudinary_openrouter` controls background preparation, photo catalog extraction, pricing complexity and translation QA. Cloudinary uses signed upload plus on-the-fly background removal; Gemma `google/gemma-4-26b-a4b-it:free` uses OpenRouter for the other three tasks. No cross-provider fallback for these tasks. Groq extraction/generation/negotiation remain unchanged. Local profile stays OpenAI until the new credentials are filled. See [AI_PROVIDERS.md](AI_PROVIDERS.md) for the exact switch, keys, restart requirement and output formats. New-provider validation is mocked, not live account/quality validation.
+
+**Studio repair, 2026-09-16:** saved `/api/v1/products/images/...` photos now download from the configured backend before enhancement/extraction instead of being opened as device files. Remote origin/path checks still prevent credential forwarding. Catalog filtering accepts exact artisan-note excerpts wrapped in quotation marks/provider labels while rejecting invented evidence. Photo failures stay on the photo screen; extraction failures remain visible on manual entry. Live synthetic-image checks succeeded for OpenAI editing and catalog extraction; this does not establish quality on actual artisan photos.
+
+**Studio sequence correction, 2026-09-15:** Next after photo preparation automatically requests catalog extraction, presents only missing fields, then opens a separate full editable catalog review before Listen & Verify. Verification no longer offers a photo-suggestion button. Existing artisan values (including zero/false) are preserved, and leaving the full review retains completed answers. AI failure still offers manual entry; live photo extraction quality remains unvalidated.
+
+**Product camera / catalog flow, 2026-09-14:** live ML Kit object guidance now drops frames between 300 ms checks and while busy, evaluates object size/centering and sampled luminance, and keeps capture manual. Five detection misses/errors yield static framing plus brightness guidance. English/Hindi voice uses the shared device TTS with stable-state delay and mute. Product photo extraction asks only missing fields before a full catalog review/editor; known zero/false values are retained. See the latest section of IMPLEMENTED_WORKFLOWS.md for tests and the still-pending real-device calibration checklist.
+
 
 **Product Studio update, 2026-09-14:** active photo preparation now uses authenticated `/api/v1/studio/prepare`: OpenAI for plain-white background editing, deterministic exposure for natural setting, and a 1200×1200 B2B frame with optional OpenAI cleanup. `/api/v1/studio/catalog` analyzes the original photo and notes for reviewable, evidence-backed catalog suggestions, never commercial or approval fields. The image-review checkbox, original/undo behavior and catalog correction step remain explicit. Photo mode/provider/review metadata persists in listing JSON; publishing requires review of OpenAI output. See [OpenAI Product Studio](OPENAI_PRODUCT_STUDIO.md) for backend `.env` settings, API boundaries and validation. Live OpenAI quality has not been validated. The 2026-09-13 deterministic photo implementation described below is historical and superseded for the active screen.
 
@@ -51,3 +70,7 @@ Payments, logistics and external-channel preparation are explicit simulations/ma
 ## Maintenance
 
 Keep source PDFs/text untouched. Keep Dart/Python transition rules consistent, preserve unrelated user edits and update coverage/checklists based on tested behavior. New production services must replace explicit boundaries, not silently relabel simulation as live integration.
+
+- Gemini photo request correction: use native `generateContent` with inline image bytes, native JSON response parsing, and distinct upstream HTTP errors. Removed blank duplicate Gemini configuration locally. Verified native image HTTP 200 versus compatibility HTTP 503 using the same key/model; 50 backend Studio/provider/translation tests passed. Flutter multipart and error-propagation regression coverage added. See `docs/AI_PROVIDERS.md`.
+
+Validation limit: the simple live native image call succeeded, but subsequent complete catalog requests still received Google HTTP 503 after bounded retries, including with low thinking effort. End-to-end live catalog success is not yet verified. All 50 backend tests and 20 Flutter Studio tests passed; Flutter analysis reported 157 existing warnings/info and no errors.

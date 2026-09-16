@@ -181,16 +181,32 @@ class _CraftFormState extends State<_CraftForm> {
               ]))));
 }
 
-final _speech = SpeechToText();
+final _speechToText = SpeechToText();
 final _tts = FlutterTts();
+int _speechGeneration = 0;
 
-Future<void> speakCraft(BuildContext context, String text) async {
+Future<void> stopCraftSpeech() async {
+  _speechGeneration++;
   try {
+    await _tts.stop();
+  } catch (_) {}
+}
+
+/// Exposes the shared TTS instance so callers can register lifecycle handlers.
+FlutterTts get craftTts => _tts;
+
+Future<void> speakCraft(BuildContext context, String text,
+    {bool silent = false}) async {
+  final generation = ++_speechGeneration;
+  try {
+    await _tts.stop();
+    if (!context.mounted || generation != _speechGeneration) return;
     await _tts.setLanguage(bilingual(context, 'en-IN', 'hi-IN'));
     await _tts.setSpeechRate(.43);
+    if (!context.mounted || generation != _speechGeneration) return;
     await _tts.speak(text);
   } catch (_) {
-    if (context.mounted)
+    if (!silent && context.mounted)
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(bilingual(
               context,
@@ -199,55 +215,117 @@ Future<void> speakCraft(BuildContext context, String text) async {
   }
 }
 
+/// Joins already-typed text with a fresh recognition result. Returns null while
+/// there is nothing recognised yet, so typing during dictation is left untouched.
+String? joinFieldDictation(String current, String spoken) {
+  final words = spoken.trim();
+  if (words.isEmpty) return null;
+  if (current.trim().isEmpty) return words;
+  if (current.endsWith(' ') || current.endsWith('\n')) return current + words;
+  return '$current $words';
+}
+
+/// The slice of speech recognition a field dictation needs. Production wraps the
+/// speech_to_text plugin; tests supply a fake so the append behaviour is verifiable
+/// without a device microphone.
+abstract class CraftDictation {
+  Future<bool> start(
+      {required String localeId,
+      void Function(String words, bool isFinal)? onResult});
+  Future<void> stop();
+}
+
+class _DeviceDictation implements CraftDictation {
+  @override
+  Future<bool> start(
+      {required String localeId,
+      void Function(String words, bool isFinal)? onResult}) async {
+    if (!await _speechToText.initialize()) return false;
+    await _speechToText.listen(
+        onResult: (result) => onResult?.call(result.recognizedWords, result.finalResult),
+        listenOptions: SpeechListenOptions(
+            localeId: localeId, listenFor: const Duration(seconds: 30)));
+    return true;
+  }
+
+  @override
+  Future<void> stop() => _speechToText.stop();
+}
+
+final _deviceDictation = _DeviceDictation();
+
 class VoiceFieldButton extends StatefulWidget {
   final TextEditingController controller;
-  const VoiceFieldButton({super.key, required this.controller});
+
+  /// Injectable for tests; production uses the shared on-device recognizer.
+  final CraftDictation? dictation;
+  const VoiceFieldButton({super.key, required this.controller, this.dictation});
   @override
   State<VoiceFieldButton> createState() => _VoiceFieldButtonState();
 }
 
 class _VoiceFieldButtonState extends State<VoiceFieldButton> {
   bool listening = false;
+
+  // Dictation appends: the text already in the field is the base every result is
+  // composed against, so pressing mic again continues the text instead of replacing it.
+  String _base = '';
+  String _lastApplied = '';
+
+  CraftDictation get _dictation => widget.dictation ?? _deviceDictation;
+
+  void _apply(String recognized, bool isFinal) {
+    if (isFinal && mounted) setState(() => listening = false);
+    final joined = joinFieldDictation(_base, recognized);
+    if (joined == null || joined == _lastApplied) return;
+    _lastApplied = joined;
+    widget.controller.value = TextEditingValue(
+        text: joined, selection: TextSelection.collapsed(offset: joined.length));
+  }
+
   @override
   void dispose() {
-    if (listening) _speech.stop();
+    if (listening) _dictation.stop();
     super.dispose();
   }
 
   @override
-  Widget build(BuildContext context) => IconButton(
-      tooltip: bilingual(
-          context, 'Speak or correct this field', 'बोलकर भरें या सुधारें'),
-      icon: Icon(listening ? Icons.stop_circle : Icons.mic_none, size: 20),
-      onPressed: () async {
-        if (listening) {
-          await _speech.stop();
-          if (mounted) setState(() => listening = false);
-          return;
-        }
-        try {
-          final available = await _speech.initialize();
-          if (!mounted) return;
-          if (!available) throw WorkflowError('Speech recognition unavailable');
-          setState(() => listening = true);
-          await _speech.listen(
-              localeId: bilingual(context, 'en_IN', 'hi_IN'),
-              onResult: (result) {
-                if (!mounted) return;
-                widget.controller.text = result.recognizedWords;
-                if (result.finalResult) setState(() => listening = false);
-              },
-              listenFor: const Duration(seconds: 30));
-        } catch (_) {
-          if (!mounted) return;
-          setState(() => listening = false);
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content: Text(bilingual(
-                  context,
-                  'Allow microphone access and enable speech recognition, or type instead.',
-                  'माइक और वॉइस सेवा चालू करें, या टाइप करें।'))));
-        }
-      });
+  Widget build(BuildContext context) {
+    final locale = bilingual(context, 'en_IN', 'hi_IN');
+    final failed = bilingual(
+        context,
+        'Allow microphone access and enable speech recognition, or type instead.',
+        'माइक और वॉइस सेवा चालू करें, या टाइप करें।');
+    return IconButton(
+        tooltip: bilingual(
+            context, 'Speak or correct this field', 'बोलकर भरें या सुधारें'),
+        icon: Icon(listening ? Icons.stop_circle : Icons.mic_none, size: 20),
+        onPressed: () async {
+          if (listening) {
+            await _dictation.stop();
+            if (mounted) setState(() => listening = false);
+            return;
+          }
+          try {
+            final started = await _dictation.start(
+                localeId: locale,
+                onResult: (words, isFinal) {
+                  if (mounted) _apply(words, isFinal);
+                });
+            if (!mounted) return;
+            if (!started) throw WorkflowError('Speech recognition unavailable');
+            // Snapshot the current field content so this session continues it.
+            _base = widget.controller.text;
+            _lastApplied = '';
+            setState(() => listening = true);
+          } catch (_) {
+            if (!mounted) return;
+            setState(() => listening = false);
+            ScaffoldMessenger.of(context)
+                .showSnackBar(SnackBar(content: Text(failed)));
+          }
+        });
+  }
 }
 
 Future<String?> pickEvidence(BuildContext context,

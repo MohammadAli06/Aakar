@@ -1,10 +1,22 @@
 """
 Listing Generation Service — Bilingual craft-aware SEO listing generator.
+
+Runs on the free Groq text tier (GENERATION_* env, else LLM_*). This task has no
+confidence signal, so the only fallback trigger is invalid JSON / schema (see
+_validate): one retry on the paid OpenAI model, then the deterministic demo listing.
 """
 import json
-import httpx
+import logging
 from typing import Dict, Any
-from app.core.config import settings
+
+import httpx
+
+from app.core.config import chat_completions_url, free_tier, settings
+
+logger = logging.getLogger(__name__)
+
+REQUIRED_KEYS = ('title_en', 'title_hi', 'desc_en', 'desc_hi', 'tags', 'craft_terms')
+
 
 # Craft terms that must be preserved verbatim (not translated)
 CRAFT_TERMS_GLOSSARY = {
@@ -35,6 +47,32 @@ Return ONLY valid JSON:
 }"""
 
 
+def _validate(listing: dict) -> dict:
+    """Fallback trigger for this task: JSON must be an object carrying every key."""
+    if not isinstance(listing, dict) or any(key not in listing for key in REQUIRED_KEYS):
+        raise ValueError("Listing is missing required keys")
+    return listing
+
+
+async def _request(base: str, key: str, model: str, prompt: str) -> dict:
+    async with httpx.AsyncClient(timeout=40) as client:
+        resp = await client.post(
+            chat_completions_url(base),
+            headers={"Authorization": f"Bearer {key}"},
+            json={
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": GENERATION_SYSTEM_PROMPT},
+                    {"role": "user", "content": prompt},
+                ],
+                "temperature": 0.4,
+                "response_format": {"type": "json_object"},
+            }
+        )
+        resp.raise_for_status()
+        return _validate(json.loads(resp.json()["choices"][0]["message"]["content"]))
+
+
 async def generate_bilingual_listing(
     attributes: Dict[str, Any],
     artisan_name: str,
@@ -44,38 +82,41 @@ async def generate_bilingual_listing(
     Generate bilingual EN + HI listing from extracted attributes.
     Craft-term preserving, SEO-optimized.
     """
-    if not settings.LLM_API_KEY:
-        return _demo_listing(craft_category)
-
     attr_text = "\n".join([
         f"- {k}: {v.get('value', 'unknown')}" if isinstance(v, dict) else f"- {k}: {v}"
         for k, v in attributes.items()
     ])
+    prompt = (
+        f"Artisan: {artisan_name}\n"
+        f"Craft Category: {craft_category}\n"
+        f"Attributes:\n{attr_text}\n\n"
+        f"Craft terms to preserve verbatim if present: {', '.join(CRAFT_TERMS_GLOSSARY)}"
+    )
 
-    try:
-        async with httpx.AsyncClient(timeout=40) as client:
-            resp = await client.post(
-                f"{settings.LLM_API_BASE}/chat/completions",
-                headers={"Authorization": f"Bearer {settings.LLM_API_KEY}"},
-                json={
-                    "model": settings.LLM_MODEL,
-                    "messages": [
-                        {"role": "system", "content": GENERATION_SYSTEM_PROMPT},
-                        {"role": "user", "content": (
-                            f"Artisan: {artisan_name}\n"
-                            f"Craft Category: {craft_category}\n"
-                            f"Attributes:\n{attr_text}\n\n"
-                            f"Craft terms to preserve verbatim if present: {', '.join(CRAFT_TERMS_GLOSSARY)}"
-                        )},
-                    ],
-                    "temperature": 0.4,
-                    "response_format": {"type": "json_object"},
-                }
-            )
-            resp.raise_for_status()
-            return json.loads(resp.json()["choices"][0]["message"]["content"])
-    except Exception:
-        return _demo_listing(craft_category)
+    base, key, model = free_tier('generation')
+    tier, served_by = 'none', 'deterministic'
+    if key:
+        try:
+            listing = await _request(base, key, model, prompt)
+            logger.info('task=generation tier=free model=%s', model)
+            return listing
+        except Exception as exc:  # malformed JSON or missing keys
+            logger.info('task=generation tier=free model=%s outcome=error: %s', model, exc)
+
+    if settings.OPENAI_API_KEY:
+        try:
+            listing = await _request('https://api.openai.com/v1',
+                                     settings.OPENAI_API_KEY.strip(),
+                                     settings.OPENAI_VISION_MODEL, prompt)
+            logger.info('task=generation tier=openai-fallback model=%s', settings.OPENAI_VISION_MODEL)
+            return listing
+        except Exception as exc:
+            logger.info('task=generation tier=openai-fallback model=%s outcome=error: %s',
+                        settings.OPENAI_VISION_MODEL, exc)
+
+    logger.info('task=generation tier=%s model=deterministic', tier)
+    return _demo_listing(craft_category)
+
 
 
 def _demo_listing(craft_category: str) -> Dict[str, Any]:

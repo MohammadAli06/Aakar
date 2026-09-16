@@ -164,7 +164,7 @@ def _readiness(product, listing, price, attributes) -> List[str]:
         missing.append('description')
     if not _text(attributes.get('image')):
         missing.append('image')
-    if attributes.get('photo_provider') in ('gemini', 'openai') and attributes.get('photo_reviewed') is not True:
+    if attributes.get('photo_provider') in ('gemini', 'openai', 'cloudinary') and attributes.get('photo_reviewed') is not True:
         missing.append('photo review')
     if not _text(attributes.get('location')):
         missing.append('location')
