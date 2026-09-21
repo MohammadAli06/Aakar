@@ -1,5 +1,50 @@
 # Implementation plan and demo checklist
 
+## Notification alert fixes — 2026-09-19
+
+- [x] Keep a signed-in account's alerts server-only: device-local demo notifications no longer merge into the account list, so the bell's unread count cannot include a row the backend cannot mark read.
+- [x] Route "Mark all as read" so the badge clears for both roles — the account list is replaced with the server's updated rows.
+- [x] Open an inquiry notification on its Chat tab: the offline engine's message link now carries `tab=chat`, and the tap handler appends it to any stored `inquiry/…` link that predates it.
+- [x] Cover with `test/commerce_engine_test.dart` and `test/commerce_repository_test.dart`.
+- [ ] Confirm on a device: send a buyer→artisan message, tap the alert, then mark all read.
+
+## Inquiry notifications and order settlement — 2026-09-18
+
+- [x] Notify the other participant when an inquiry message or voice note is sent, with a link that opens that conversation on its Chat tab. Sender is never notified about their own message.
+- [x] Store notifications per account (`Notification` model + `/api/v1/notifications/` list and `/read`) so the bell survives a refresh, and route the bell's mark-all-read to the account.
+- [x] Persist the buyer's settlement: `PATCH /orders/{id}/pay`, `/inspection` and `/complete`, with the engine's trigger preconditions; stamp the inspection deadline on delivery; route "Mark in transit"/"Confirm delivery received" through `delivery-status`.
+- [x] Only show the payment confirmation when the write actually succeeded.
+- [ ] Still engine-local: `issue`, `checkpoint`, `representation`, `production` (step 6) and the older `dispatch()` helper.
+- [ ] Confirm the notification tap and the payment/settlement chain on a device against a restarted backend.
+
+## Calendar pickers for date fields — 2026-09-18
+
+- [x] Add `date` / `withTime` flags to `CraftField` and render a read-only field with a calendar affordance, storing `yyyy-MM-dd` (and `yyyy-MM-dd HH:mm` when a time is asked for).
+- [x] Mark all seven date fields: production plan start/completion, dispatch date and estimated delivery, buyer target date (requirement/inquiry and quotation forms), and the on-site demo date.
+- [x] Keep time out of the date-only fields — the on-site demo date is the only one that continues to a time picker.
+- [x] Drop the `(YYYY-MM-DD)` label hints and keep the stored ISO shape unchanged, so no record or display needs migrating.
+- [x] Cover with `test/craft_date_field_test.dart`.
+- [ ] Confirm the pickers on a device, including reopening a saved order's production plan and dispatch forms.
+
+## First-run coaching and buyer order fixes — 2026-09-18
+
+- [x] Add a five-stop coach-mark tour (`showcaseview` 5.1.0) that runs once per role on the first Home visit, spotlights the real bottom-bar icon or Add product button, and carries a bilingual caption with an `n/total` counter and Skip/Next controls.
+- [x] Keep it fully frontend: the seen flag lives in SharedPreferences (`onboarding_seen_artisan` / `onboarding_seen_buyer`), registered once in `AakarApp.initState` so widget tests get the scope too. No backend route, no schema.
+- [x] Add Profile → **App guide** to replay the tour without touching the stored flag. Fixed 2026-09-18: the workspace reuses one State across tabs, so the replay is now detected in `didUpdateWidget` rather than only in `initState`, and a replay bypasses the once-per-screen guard.
+- [x] Fix the buyer order list rendering every order twice, and the payment button printing the ₹ symbol twice.
+- [ ] Confirm the tour on a device, including the replay path from Profile and both roles' step copy.
+
+## Artisan Order Fulfillment Flow (14-Step) — 2026-09-18
+
+- [x] Backend: Add 7 PATCH endpoints to `orders.py` (`/accept`, `/production-plan`, `/production-progress`, `/production-complete`, `/packaging`, `/dispatch`, `/delivery-status`). Covered by `backend/tests/test_orders_api.py`, which drives the whole artisan flow and reads it back as the buyer.
+- [x] Repository: Wire `_orderActions` and `_orderAct` in `commerce_repository.dart` to the account client (`ApiClient.patch` via `OrderService.act`). The first pass used the demo-workspace client, whose host and token are empty for a signed-in account, so every step failed at runtime; corrected 2026-09-18 and locked by a repository test.
+- [x] Load requirements, inquiries and orders independently in `hydrate()`, so one failing endpoint no longer blanks the records the others returned.
+- [x] UI Tabbed Order List: Implement New / In Progress / Completed tabs with dynamic next-action chips in `orderList()`.
+- [x] UI 14-Step Fulfillment Lifecycle: Order details, accept/decline, confirmation, production planning, milestone progress with %, proof upload, mark complete, packaging, dispatch, dispatch confirmation, delivery status checkpoints, completion celebration, buyer connect / reorder.
+- [x] Retain buyer-facing view of order inspection, milestones, and issues.
+- [ ] Reroute or remove the order buttons still on the local engine (`production`, `checkpoint`, `shipping`, `delivery`, `inspection`, `complete`, `pay`, `issue`, `representation`): they duplicate the new server steps and revert on refresh.
+- [ ] Verify the flow on a device against a restarted backend that has the `orders` table.
+
 ## Buyer reference UI ? 2026-09-17
 
 - [x] Map the supplied buyer flow against active screens; preserve working phone-OTP signup.
@@ -20,6 +65,7 @@ See [buyer screen-by-screen coverage](BUYER_FLOW.md).
 - [x] Scheduled edits/cancellation, server-enforced live/closed phases, sealed buyer offers.
 - [x] Compare, single/split/reject decisions, quantity checks and pre-quotation buyer withdrawal.
 - [x] Persist selected-offer handoffs and open existing quotation UI without auto-accepting orders.
+- [x] Release a bidding lot when a session closes with no offers (2026-09-19): an ended, unselected session no longer holds its full quantity reserved, so the product can be put up again instead of failing with "Quantity exceeds unreserved stock". Covered by `backend/tests/test_bidding.py`.
 - [ ] Device acceptance with distinct verified artisan/buyer accounts; no live bid was placed during automated tests.
 - [ ] Synchronize downstream quotations/orders and inventory settlement across real accounts; the current B2B engine remains demo behavior.
 
@@ -90,6 +136,16 @@ Accept when the same phone can switch roles without losing language/session/busi
 - [x] Show the B2B background switch only when B2B catalogue frame is selected.
 
 - [x] Rework the artisan Home and bottom bar at user request (2026-09-15): four summary tiles (Products, Bidding with a Live Sessions marker, Inquiries, Orders), a paired Add a product / Host Bidding action row, a Bulk Bidding Hub card with a countdown, and My Products below it. Profile left the bottom bar for both roles and is now reached from the app bar avatar; the sign-out action lives only inside the profile screen. Bidding is a new tab. SCOPE OVERRIDE: `UPDATED_ARCHITECTURE.md` §34-39 and AGENTS.md exclude bidding from the demo, and this reverses that decision at the user's explicit instruction. The lot shown is a fixed sample with a countdown anchored to app start; sealed bidding has no backend, no offer can be accepted, and the card labels itself as a demonstration. `test/artisan_home_bidding_test.dart` covers the bar, the avatar route, the absence of sign out and the sample disclaimer; the buyer bar is unchanged.
+
+- [x] Searchable state / union-territory and city fields on the profile form (2026-09-17): all 28 states and 8 UTs live in `lib/core/data/india_locations.dart` with their cities/districts; the "Create profile" state and city fields filter as you type and accept a hand-typed value, the city list follows the chosen state and a stale city is dropped when the state changes, and the buyer signup screen now uses the same list instead of its ten-entry stub. Covered by `test/profile_location_test.dart`.
+
+- [x] Make a language change actually reach the chat bridge (2026-09-17): the language screen only saved `selected_language` locally, so accounts kept their signup default and the server went on reporting "same preferred language" with no translation produced. Confirming a language now writes `language_pref` to the signed-in account and refreshes the session; the commerce home reconciles a device/account mismatch once, and `applyAccount` reflects a language change in the local profile row. Covered by `test/language_sync_test.dart`, a repository test and a backend bridge test.
+
+- [x] Complete the shared inquiry workspace (2026-09-17): the inquiry screen is one thread with Request / Chat / Quotation tabs, an 8s poll plus pull-to-refresh and foreground refresh, and a reviewed language bridge driven by each account's `language_pref` (a translation is kept only when its target matches the receiver; stale and same-language drafts are discarded, originals always preserved). Voice notes record in-app, upload to participant-scoped storage and play back in the thread, never translated. Buyers can request specific changes to an open quotation, which reopens it for a revised version; a new capacity answer or quotation supersedes the previous open version. `POST /preview`, `request-change` and `voice` routes added, `InquiryWorkspace` wired into the detail screen, and `requestQuoteChange` implemented. 14 backend inquiry tests and 165 Flutter tests pass (backend 118 total).
+
+- [x] Move inquiries and quotations off the device-local demo engine (2026-09-17): inquiries are account-scoped rows owned by both participants, so a buyer's inquiry appears in the artisan's Inquiries tab on the artisan's own account. New `Inquiry`/`Order` models and `/api/v1/inquiries` (+ read-only `/api/v1/orders`) enforce participation, role, MOQ, confirmed capacity, the cost floor and milestone totals server-side; accepting a quotation records a shared order. The app hydrates both from the backend and routes the inquiry actions through `InquiryService`; the signed-out workspace stays local. Order lifecycle steps (payment, production, shipping, inspection, completion, issues) are still local demo and remain the next migration. 8 backend and 3 Flutter tests added; backend 112 and full Flutter suite green.
+
+- [x] Give the buyer a dedicated inquiry & quotation tab and move Alerts to an app bar bell (2026-09-17): the buyer bar became Home, Discover, Inquiries, Bidding, Orders, reusing the existing shared inquiry/quote workspace and surfacing each inquiry's latest quotation, status and unanswered-quote marker. Alerts left the bar for a bell with an unread badge beside the language and profile actions, which also gives the artisan a route the bar never had. `notifications` is no longer a root page so the bell push shows a back control. Covered by `test/artisan_home_bidding_test.dart`; 67 focused Flutter tests pass and analyzer output is unchanged apart from pre-existing informational lints.
 
 - [x] Make field dictation continue the held text instead of replacing it (2026-09-15): every mic press now snapshots the field's current content and appends the recognised words to it, so a second press no longer wipes what an earlier press or the artisan typed. On a re-press only that press's words are rebuilt, so refined partial results do not duplicate the earlier text; the caret lands at the end. Applies to every mic-enabled field because they all render the shared `VoiceFieldButton`. Recogniser access is behind an injectable `CraftDictation` seam, covered by `test/voice_field_button_test.dart`. On-device dictation accuracy itself remains unvalidated.
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/data/india_locations.dart';
 import '../../core/localization/app_strings.dart';
 import '../../core/services/app_providers.dart';
 import '../../core/services/auth_service.dart';
@@ -49,20 +50,6 @@ class _BuyerAuthScreenState extends ConsumerState<BuyerAuthScreen> {
     'gifting': ['Gifting', 'उपहार'],
     'other': ['Other', 'अन्य'],
   };
-
-  static const _states = [
-    'Rajasthan',
-    'Gujarat',
-    'Uttar Pradesh',
-    'Madhya Pradesh',
-    'West Bengal',
-    'Odisha',
-    'Tamil Nadu',
-    'Karnataka',
-    'Maharashtra',
-    'Assam',
-    'Other',
-  ];
 
   @override
   void dispose() {
@@ -136,9 +123,10 @@ class _BuyerAuthScreenState extends ConsumerState<BuyerAuthScreen> {
       return _b(context, 'That email is already registered.',
           'यह ईमेल पहले से पंजीकृत है।');
     }
-    if (text.contains('wrong-password') || text.contains('invalid-credential')) {
-      return _b(context, 'Incorrect email or password.',
-          'ईमेल या पासवर्ड गलत है।');
+    if (text.contains('wrong-password') ||
+        text.contains('invalid-credential')) {
+      return _b(
+          context, 'Incorrect email or password.', 'ईमेल या पासवर्ड गलत है।');
     }
     if (text.contains('This account is registered as a')) {
       return _b(
@@ -220,7 +208,7 @@ class _BuyerAuthScreenState extends ConsumerState<BuyerAuthScreen> {
               _Dropdown(
                 label: _b(context, 'State', 'राज्य'),
                 value: _state,
-                options: _states,
+                options: indiaStates,
                 onChanged: (v) => setState(() => _state = v),
               ),
               _Field(
@@ -402,9 +390,7 @@ class _Dropdown extends StatelessWidget {
         value: value,
         isExpanded: true,
         style: const TextStyle(
-            fontFamily: 'Poppins',
-            fontSize: 14,
-            color: AppColors.textPrimary),
+            fontFamily: 'Poppins', fontSize: 14, color: AppColors.textPrimary),
         decoration: InputDecoration(
           labelText: label,
           labelStyle: const TextStyle(

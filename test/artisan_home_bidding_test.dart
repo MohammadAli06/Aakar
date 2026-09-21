@@ -12,6 +12,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'test_session_helper.dart';
 import 'package:craft_connect/features/commerce/data/bidding_repository.dart';
+import 'package:craft_connect/features/commerce/presentation/craft_widgets.dart';
 
 /// The artisan home, bottom bar and Bulk Bidding surface.
 class EmptyBidding extends BiddingRepository {
@@ -31,6 +32,10 @@ void main() {
     SharedPreferences.setMockInitialValues({
       'commerce_state_v1': jsonEncode(CommerceEngine.seed()),
       'selected_language': language,
+      // A returning user: the first-run tour has already been seen, so these
+      // tests exercise the screens rather than the coach marks.
+      'onboarding_seen_artisan': true,
+      'onboarding_seen_buyer': true,
     });
     final container = ProviderContainer(overrides: [
       biddingProvider(testAccount(role).id)
@@ -80,9 +85,16 @@ void main() {
     await open(tester, 'home');
     expect(find.text('Bulk Bidding Hub'), findsOneWidget);
     expect(find.text('Live Sessions'), findsOneWidget);
-    expect(find.text('Add a product'), findsOneWidget);
+    expect(find.text('Add product'), findsOneWidget);
     expect(find.text('Host Bidding'), findsOneWidget);
     expect(find.textContaining('Ends in'), findsNothing);
+    // Both home actions stay one line tall: a wrapped label puffed the add
+    // button up next to the shorter bidding button.
+    final add = tester.getSize(find.ancestor(
+        of: find.text('Add product'), matching: find.byType(CraftButton)));
+    final host = tester.getSize(find.ancestor(
+        of: find.text('Host Bidding'), matching: find.byType(CraftButton)));
+    expect(add.height, host.height);
     expect(tester.takeException(), isNull);
   });
 
@@ -100,12 +112,26 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('the buyer bar carries Bidding and no longer Profile',
+  testWidgets('the buyer bar carries Inquiries and no longer Profile',
       (tester) async {
     await open(tester, 'home', role: AccountRole.buyer);
-    expect(
-        labelsIn(tester), ['Home', 'Discover', 'Bidding', 'Orders', 'Alerts']);
+    expect(labelsIn(tester),
+        ['Home', 'Discover', 'Inquiries', 'Bidding', 'Orders']);
     expect(find.text('Profile'), findsNothing);
+    // Alerts left the bar for the app bar bell.
+    expect(
+        find.descendant(
+            of: find.byType(NavigationBar), matching: find.text('Alerts')),
+        findsNothing);
+    expect(find.byTooltip('Alerts'), findsOneWidget);
+  });
+
+  testWidgets('the app bar bell opens the buyer alerts', (tester) async {
+    await open(tester, 'home', role: AccountRole.buyer);
+    await tester.tap(find.byTooltip('Alerts'));
+    await tester.pumpAndSettle();
+    expect(find.text('Notifications'), findsWidgets);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('a buyer sees their own side of the bidding round',

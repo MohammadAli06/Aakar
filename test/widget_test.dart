@@ -31,7 +31,12 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    SharedPreferences.setMockInitialValues({});
+    SharedPreferences.setMockInitialValues({
+      // Seen already, so the first-run tour does not overlay the workspace these
+      // navigation tests drive.
+      'onboarding_seen_artisan': true,
+      'onboarding_seen_buyer': true,
+    });
     final container = ProviderContainer(overrides: [
       selectedLanguageProvider.overrideWith((ref) => language),
       sessionProvider.overrideWith((ref) => asRole == null

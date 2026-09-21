@@ -11,24 +11,38 @@ import '../../capture/capture_flow.dart';
 class CraftField {
   final String key, en, hi;
   final bool required, numeric, toggle, multiline;
+
+  /// Picks a date from a calendar instead of typing one, stored `yyyy-MM-dd`.
+  /// A date field never asks for a time.
+  final bool date;
+
+  /// Adds a time picker after the calendar, stored `yyyy-MM-dd HH:mm`. Only for
+  /// the few fields that genuinely need a clock time.
+  final bool withTime;
   final List<String>? options;
   const CraftField(this.key, this.en, this.hi,
       {this.required = false,
       this.numeric = false,
       this.toggle = false,
       this.multiline = false,
+      this.date = false,
+      this.withTime = false,
       this.options});
 }
 
 Future<Record?> craftForm(
         BuildContext context, String title, List<CraftField> fields,
-        {Record initial = const {}, String? description, String? button}) =>
+        {Record initial = const {},
+        String? description,
+        String? button,
+        Map<String, List<String>>? sections}) =>
     Navigator.of(context).push<Record>(MaterialPageRoute(
         builder: (_) => _CraftForm(
             title: title,
             fields: fields,
             initial: initial,
             description: description,
+            sections: sections,
             button: button)));
 
 class _CraftForm extends StatefulWidget {
@@ -36,17 +50,21 @@ class _CraftForm extends StatefulWidget {
   final List<CraftField> fields;
   final Record initial;
   final String? description, button;
+  final Map<String, List<String>>? sections;
   const _CraftForm(
       {required this.title,
       required this.fields,
       required this.initial,
       this.description,
+      this.sections,
       this.button});
   @override
   State<_CraftForm> createState() => _CraftFormState();
 }
 
 class _CraftFormState extends State<_CraftForm> {
+  int _step = 0;
+  final _scroll = ScrollController();
   final _form = GlobalKey<FormState>();
   final _controllers = <String, TextEditingController>{};
   late Record values;
@@ -76,10 +94,49 @@ class _CraftFormState extends State<_CraftForm> {
 
   @override
   void dispose() {
+    _scroll.dispose();
     for (final c in _controllers.values) {
       c.dispose();
     }
     super.dispose();
+  }
+
+  String _two(int value) => value.toString().padLeft(2, '0');
+
+  /// Opens the calendar for a date field and writes the chosen value back into
+  /// the field's controller, so it flows through the normal save path.
+  ///
+  /// A date-only field stops after the calendar. Only a field marked [withTime]
+  /// continues to a time picker.
+  Future<void> _pickDate(CraftField field) async {
+    final controller = _controllers[field.key]!;
+    final now = DateTime.now();
+    final first = DateTime(now.year - 1);
+    final last = DateTime(now.year + 5);
+    final existing = DateTime.tryParse(controller.text.trim());
+    var initial = existing ?? now;
+    // showDatePicker asserts when the initial date sits outside the range.
+    if (initial.isBefore(first)) initial = first;
+    if (initial.isAfter(last)) initial = last;
+
+    final date = await showDatePicker(
+        context: context,
+        initialDate: initial,
+        firstDate: first,
+        lastDate: last);
+    if (date == null || !mounted) return;
+
+    var value = '${date.year}-${_two(date.month)}-${_two(date.day)}';
+    if (field.withTime) {
+      final time = await showTimePicker(
+          context: context,
+          initialTime: existing == null
+              ? TimeOfDay.now()
+              : TimeOfDay(hour: existing.hour, minute: existing.minute));
+      if (time == null || !mounted) return;
+      value = '$value ${_two(time.hour)}:${_two(time.minute)}';
+    }
+    setState(() => controller.text = value);
   }
 
   @override
@@ -88,97 +145,133 @@ class _CraftFormState extends State<_CraftForm> {
       body: SafeArea(
           child: Form(
               key: _form,
-              child: ListView(padding: const EdgeInsets.all(20), children: [
-                if (widget.description != null)
-                  Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: Text(widget.description!,
-                          style: const TextStyle(fontSize: 12))),
-                for (final f in widget.fields)
-                  Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: f.toggle
-                          ? SwitchListTile.adaptive(
-                              contentPadding: EdgeInsets.zero,
-                              title: Text(bilingual(context, f.en, f.hi),
-                                  style: const TextStyle(fontSize: 13)),
-                              value: values[f.key] == true,
-                              onChanged: (v) =>
-                                  setState(() => values[f.key] = v))
-                          : f.options != null
-                              ? DropdownButtonFormField<String>(
-                                  initialValue:
-                                      f.options!.contains('${values[f.key]}')
+              child: ListView(
+                  controller: _scroll,
+                  padding: const EdgeInsets.all(20),
+                  children: [
+                    if (widget.description != null)
+                      Padding(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: Text(widget.description!,
+                              style: const TextStyle(fontSize: 12))),
+                    if (widget.sections != null) ...[
+                      Text(
+                          '${_step + 1} / ${widget.sections!.length} · ${widget.sections!.keys.elementAt(_step)}',
+                          style: const TextStyle(fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 8),
+                      LinearProgressIndicator(
+                          value: (_step + 1) / widget.sections!.length),
+                      const SizedBox(height: 20),
+                    ],
+                    for (final f in widget.fields.where((f) =>
+                        widget.sections == null ||
+                        widget.sections!.values
+                            .elementAt(_step)
+                            .contains(f.key)))
+                      Padding(
+                          key: ValueKey(f.key),
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: f.toggle
+                              ? SwitchListTile.adaptive(
+                                  contentPadding: EdgeInsets.zero,
+                                  title: Text(bilingual(context, f.en, f.hi),
+                                      style: const TextStyle(fontSize: 13)),
+                                  value: values[f.key] == true,
+                                  onChanged: (v) =>
+                                      setState(() => values[f.key] = v))
+                              : f.options != null
+                                  ? DropdownButtonFormField<String>(
+                                      initialValue: f.options!
+                                              .contains('${values[f.key]}')
                                           ? '${values[f.key]}'
                                           : null,
-                                  isExpanded: true,
-                                  decoration: InputDecoration(
-                                      labelText:
-                                          bilingual(context, f.en, f.hi)),
-                                  items: f.options!
-                                      .map((v) => DropdownMenuItem(
-                                          value: v,
-                                          child: Text(v.replaceAll('_', ' '),
-                                              overflow: TextOverflow.ellipsis)))
-                                      .toList(),
-                                  onChanged: (v) => values[f.key] = v,
-                                  validator: (v) => f.required && v == null
-                                      ? bilingual(context, 'Choose an option',
-                                          'विकल्प चुनें')
-                                      : null)
-                              : TextFormField(
-                                  controller: _controllers[f.key],
-                                  maxLines: f.multiline ? 3 : 1,
-                                  keyboardType: f.numeric
-                                      ? const TextInputType.numberWithOptions(
-                                          decimal: false)
-                                      : TextInputType.text,
-                                  decoration: InputDecoration(
-                                      labelText: bilingual(context, f.en, f.hi),
-                                      suffixIcon: ['evidence', 'document', 'reference_image', 'attachment'].contains(f.key)
-                                          ? IconButton(
-                                              icon: const Icon(Icons.attach_file),
-                                              onPressed: () async {
-                                                final path =
-                                                    await pickEvidence(context);
-                                                if (path != null && mounted)
-                                                  _controllers[f.key]!.text =
-                                                      path;
-                                              })
-                                          : !f.numeric
-                                              ? VoiceFieldButton(controller: _controllers[f.key]!)
-                                              : null),
-                                  validator: (v) {
-                                    if (f.required && (v ?? '').trim().isEmpty)
-                                      return bilingual(
-                                          context, 'Required', 'ज़रूरी');
-                                    if (f.numeric &&
-                                        (v ?? '').isNotEmpty &&
-                                        (double.tryParse(v!) == null ||
-                                            number(v) < 0))
-                                      return bilingual(
-                                          context,
-                                          'Enter a non-negative number',
-                                          'सही संख्या भरें');
-                                    return null;
-                                  })),
-                CraftButton(
-                    widget.button ??
-                        bilingual(
-                            context, 'Save & continue', 'सहेजें और आगे बढ़ें'),
-                    onPressed: () {
-                  if (!_form.currentState!.validate()) return;
-                  for (final f in widget.fields) {
-                    if (!f.toggle && f.options == null)
-                      values[f.key] = f.numeric
-                          ? number(_controllers[f.key]!.text)
-                          : _controllers[f.key]!.text.trim();
-                    if (f.toggle) values[f.key] = values[f.key] == true;
-                  }
-                  Navigator.pop(context, values);
-                }),
-                const SizedBox(height: 30),
-              ]))));
+                                      isExpanded: true,
+                                      decoration: InputDecoration(
+                                          labelText:
+                                              bilingual(context, f.en, f.hi)),
+                                      items: f.options!
+                                          .map((v) => DropdownMenuItem(
+                                              value: v,
+                                              child: Text(v.replaceAll('_', ' '),
+                                                  overflow: TextOverflow.ellipsis)))
+                                          .toList(),
+                                      onChanged: (v) => values[f.key] = v,
+                                      validator: (v) => f.required && v == null ? bilingual(context, 'Choose an option', 'विकल्प चुनें') : null)
+                                  : TextFormField(
+                                      controller: _controllers[f.key],
+                                      // A date field is filled from the calendar, so
+                                      // the keyboard is never used for it.
+                                      readOnly: f.date,
+                                      onTap: f.date ? () => _pickDate(f) : null,
+                                      maxLines: f.multiline ? 3 : 1,
+                                      keyboardType: f.numeric ? const TextInputType.numberWithOptions(decimal: false) : TextInputType.text,
+                                      decoration: InputDecoration(
+                                          labelText: bilingual(context, f.en, f.hi),
+                                          hintText: f.date ? (f.withTime ? 'YYYY-MM-DD  HH:MM' : 'YYYY-MM-DD') : null,
+                                          suffixIcon: f.date
+                                              ? IconButton(tooltip: bilingual(context, 'Pick a date', 'तारीख चुनें'), icon: const Icon(Icons.calendar_month_outlined), onPressed: () => _pickDate(f))
+                                              : ['evidence', 'document', 'reference_image', 'attachment'].contains(f.key)
+                                                  ? IconButton(
+                                                      icon: const Icon(Icons.attach_file),
+                                                      onPressed: () async {
+                                                        final path =
+                                                            await pickEvidence(
+                                                                context);
+                                                        if (path != null &&
+                                                            mounted)
+                                                          _controllers[f.key]!
+                                                              .text = path;
+                                                      })
+                                                  : !f.numeric
+                                                      ? VoiceFieldButton(controller: _controllers[f.key]!)
+                                                      : null),
+                                      validator: (v) {
+                                        if (f.required &&
+                                            (v ?? '').trim().isEmpty)
+                                          return bilingual(
+                                              context, 'Required', 'ज़रूरी');
+                                        if (f.numeric &&
+                                            (v ?? '').isNotEmpty &&
+                                            (double.tryParse(v!) == null ||
+                                                number(v) < 0))
+                                          return bilingual(
+                                              context,
+                                              'Enter a non-negative number',
+                                              'सही संख्या भरें');
+                                        return null;
+                                      })),
+                    CraftButton(
+                        widget.sections != null &&
+                                _step < widget.sections!.length - 1
+                            ? bilingual(context, 'Next', 'आगे')
+                            : widget.button ??
+                                bilingual(context, 'Save & continue',
+                                    'सहेजें और आगे बढ़ें'), onPressed: () {
+                      if (!_form.currentState!.validate()) return;
+                      for (final f in widget.fields) {
+                        if (!f.toggle && f.options == null)
+                          values[f.key] = f.numeric
+                              ? number(_controllers[f.key]!.text)
+                              : _controllers[f.key]!.text.trim();
+                        if (f.toggle) values[f.key] = values[f.key] == true;
+                      }
+                      if (widget.sections != null &&
+                          _step < widget.sections!.length - 1) {
+                        setState(() => _step++);
+                        if (_scroll.hasClients) _scroll.jumpTo(0);
+                      } else {
+                        Navigator.pop(context, values);
+                      }
+                    }),
+                    if (_step > 0)
+                      TextButton(
+                          onPressed: () {
+                            setState(() => _step--);
+                            if (_scroll.hasClients) _scroll.jumpTo(0);
+                          },
+                          child: Text(bilingual(context, 'Previous', 'पिछला'))),
+                    const SizedBox(height: 30),
+                  ]))));
 }
 
 final _speechToText = SpeechToText();
@@ -242,7 +335,8 @@ class _DeviceDictation implements CraftDictation {
       void Function(String words, bool isFinal)? onResult}) async {
     if (!await _speechToText.initialize()) return false;
     await _speechToText.listen(
-        onResult: (result) => onResult?.call(result.recognizedWords, result.finalResult),
+        onResult: (result) =>
+            onResult?.call(result.recognizedWords, result.finalResult),
         listenOptions: SpeechListenOptions(
             localeId: localeId, listenFor: const Duration(seconds: 30)));
     return true;
@@ -280,7 +374,8 @@ class _VoiceFieldButtonState extends State<VoiceFieldButton> {
     if (joined == null || joined == _lastApplied) return;
     _lastApplied = joined;
     widget.controller.value = TextEditingValue(
-        text: joined, selection: TextSelection.collapsed(offset: joined.length));
+        text: joined,
+        selection: TextSelection.collapsed(offset: joined.length));
   }
 
   @override
@@ -365,7 +460,7 @@ const requestFields = [
       numeric: true),
   CraftField('lead_days', 'Needed within (days)', 'कितने दिनों में चाहिए',
       numeric: true, required: true),
-  CraftField('target_date', 'Target date (YYYY-MM-DD)', 'लक्ष्य तारीख'),
+  CraftField('target_date', 'Target date', 'लक्ष्य तारीख', date: true),
   CraftField('location', 'Delivery location', 'डिलीवरी स्थान', required: true),
   CraftField('customization', 'Customization / size / colour / logo',
       'बदलाव / आकार / रंग / लोगो',

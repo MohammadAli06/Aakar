@@ -27,6 +27,7 @@ class _BiddingPanelState extends ConsumerState<BiddingPanel> {
   final price = TextEditingController();
   final duration = TextEditingController(text: '120');
   DateTime start = DateTime.now().add(const Duration(hours: 1));
+  DateTime end = DateTime.now().add(const Duration(hours: 3));
   final allocations = <String, TextEditingController>{};
   final selected = <String>{};
   String t(String en, String hi) => bilingual(context, en, hi);
@@ -102,6 +103,7 @@ class _BiddingPanelState extends ConsumerState<BiddingPanel> {
       price.clear();
       duration.text = '120';
       start = DateTime.now().add(const Duration(hours: 1));
+      end = DateTime.now().add(const Duration(hours: 3));
     });
   }
 
@@ -306,7 +308,8 @@ class _BiddingPanelState extends ConsumerState<BiddingPanel> {
             'लागत: ${money(matching?['cost_floor'] ?? product?['cost_floor'])}। न्यूनतम मूल्य आप तय करें।'),
         ListTile(
             contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.calendar_month),
+            leading:
+                const Icon(Icons.play_circle_outline, color: Color(0xFF285448)),
             title: Text(t('Start date & time (local)',
                 'शुरू होने की तारीख और समय (स्थानीय)')),
             subtitle: Text(stamp(start.toIso8601String())),
@@ -320,15 +323,64 @@ class _BiddingPanelState extends ConsumerState<BiddingPanel> {
               if (date == null || !mounted) return;
               final time = await showTimePicker(
                   context: context, initialTime: TimeOfDay.fromDateTime(start));
-              if (time != null && mounted)
-                setState(() => start = DateTime(
-                    date.year, date.month, date.day, time.hour, time.minute));
+              if (time != null && mounted) {
+                setState(() {
+                  final newStart = DateTime(
+                      date.year, date.month, date.day, time.hour, time.minute);
+                  final diff = end.difference(start);
+                  start = newStart;
+                  // Keep end after start if start moved past it
+                  if (!end.isAfter(start)) {
+                    end = start.add(
+                        diff.inMinutes > 0 ? diff : const Duration(hours: 2));
+                  }
+                  duration.text = '${end.difference(start).inMinutes}';
+                });
+              }
             }),
-        input(duration, 'Duration (minutes)', 'अवधि (मिनट)'),
+        ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.stop_circle_outlined,
+                color: Color(0xFFC25E00)),
+            title: Text(t('End date & time (local)',
+                'समाप्त होने की तारीख और समय (स्थानीय)')),
+            subtitle: Text(stamp(end.toIso8601String())),
+            onTap: () async {
+              final date = await showDatePicker(
+                  context: context,
+                  initialDate: end.isBefore(start)
+                      ? start.add(const Duration(hours: 1))
+                      : end,
+                  firstDate: start,
+                  lastDate: start.add(const Duration(days: 7)));
+              if (date == null || !mounted) return;
+              final time = await showTimePicker(
+                  context: context, initialTime: TimeOfDay.fromDateTime(end));
+              if (time != null && mounted) {
+                final newEnd = DateTime(
+                    date.year, date.month, date.day, time.hour, time.minute);
+                if (newEnd.isAfter(start)) {
+                  setState(() {
+                    end = newEnd;
+                    duration.text = '${end.difference(start).inMinutes}';
+                  });
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text(t('End time must be after start time',
+                          'समाप्ति का समय शुरू होने के समय के बाद होना चाहिए'))));
+                }
+              }
+            }),
+        input(duration, 'Or set duration (minutes)', 'या अवधि भरें (मिनट)'),
         button(
             'Find relevant buyers',
             'संबंधित खरीदार खोजें',
             () => run(() async {
+                  // Keep end in sync with duration in case user typed duration
+                  final m = int.tryParse(duration.text);
+                  if (m != null && m > 0) {
+                    end = start.add(Duration(minutes: m));
+                  }
                   validate();
                   matching = await bids.matches('${product!['id']}',
                       sessionId: editing?['id']);
@@ -360,11 +412,7 @@ class _BiddingPanelState extends ConsumerState<BiddingPanel> {
           DetailRow(t('Quantity', 'मात्रा'), quantity.text),
           DetailRow(t('Minimum / piece', 'न्यूनतम / पीस'), money(price.text)),
           DetailRow(t('Starts', 'शुरू'), stamp(start.toIso8601String())),
-          DetailRow(
-              t('Ends', 'समाप्त'),
-              stamp(start
-                  .add(Duration(minutes: int.parse(duration.text)))
-                  .toIso8601String())),
+          DetailRow(t('Ends', 'समाप्त'), stamp(end.toIso8601String())),
           DetailRow(t('Matched buyers', 'खरीदार'),
               '${records(matching?['buyers']).length}')
         ])),
@@ -381,10 +429,7 @@ class _BiddingPanelState extends ConsumerState<BiddingPanel> {
                     'quantity': int.parse(quantity.text),
                     'min_price': double.parse(price.text),
                     'starts_at': start.toUtc().toIso8601String(),
-                    'ends_at': start
-                        .add(Duration(minutes: int.parse(duration.text)))
-                        .toUtc()
-                        .toIso8601String(),
+                    'ends_at': end.toUtc().toIso8601String(),
                     if (editing != null) 'revision': editing!['revision']
                   }, id: editing?['id']);
                   if (mounted)
@@ -416,6 +461,9 @@ class _BiddingPanelState extends ConsumerState<BiddingPanel> {
     if (!start.isAfter(bids.serverNow.toLocal()))
       throw WorkflowError(
           t('Choose a future start time.', 'भविष्य का समय चुनें।'));
+    if (!end.isAfter(start))
+      throw WorkflowError(t('End time must be after start time.',
+          'समाप्ति का समय शुरू होने के बाद होना चाहिए।'));
   }
 
   Widget productCard(Record p) => CraftCard(
@@ -464,8 +512,8 @@ class _BiddingPanelState extends ConsumerState<BiddingPanel> {
                   quantity.text = '${s['quantity']}';
                   price.text = '${s['min_price']}';
                   start = DateTime.parse(s['starts_at']).toLocal();
-                  duration.text =
-                      '${DateTime.parse(s['ends_at']).difference(start).inMinutes}';
+                  end = DateTime.parse(s['ends_at']).toLocal();
+                  duration.text = '${end.difference(start).inMinutes}';
                   if (mounted) setState(() => step = 2);
                 })),
         button(
@@ -643,15 +691,20 @@ class _BiddingPanelState extends ConsumerState<BiddingPanel> {
                     await bids.act(s, 'handoff');
                   })),
         for (final inquiry in records(s['inquiries']))
-          button(
-              '${t('Open quotation', 'कोटेशन खोलें')} · ${inquiry['buyer_name']}',
-              '${t('Open quotation', 'कोटेशन खोलें')} · ${inquiry['buyer_name']}',
-              () => run(() async {
-                    await commerce.importBiddingInquiry(
-                        inquiry, Map<String, dynamic>.from(s['product']));
-                    if (mounted)
-                      context.push('/workspace/inquiry/${inquiry['id']}');
-                  })),
+          if (!buyer || inquiry['buyer_id'] == commerce.actor)
+            button(
+                buyer
+                    ? t('Open quotation', 'कोटेशन खोलें')
+                    : '${t('Open quotation', 'कोटेशन खोलें')} · ${inquiry['buyer_name']}',
+                buyer
+                    ? t('Open quotation', 'कोटेशन खोलें')
+                    : '${t('Open quotation', 'कोटेशन खोलें')} · ${inquiry['buyer_name']}',
+                () => run(() async {
+                      await commerce.importBiddingInquiry(
+                          inquiry, Map<String, dynamic>.from(s['product']));
+                      if (mounted)
+                        context.push('/workspace/inquiry/${inquiry['id']}');
+                    })),
       ],
       if (!buyer && ['cancelled', 'rejected', 'quotation'].contains(status))
         button('Create new bidding', 'नई बोली बनाएँ', newSession,

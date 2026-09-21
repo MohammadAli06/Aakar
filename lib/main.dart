@@ -32,6 +32,7 @@ void main() async {
   }
 
   final savedLanguage = await loadSelectedLanguage();
+
   runApp(ProviderScope(
     overrides: [selectedLanguageProvider.overrideWith((ref) => savedLanguage)],
     child: const AakarApp(),

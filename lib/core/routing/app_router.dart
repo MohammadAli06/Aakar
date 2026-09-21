@@ -195,7 +195,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           path: '/workspace/:page/:id',
           builder: (context, state) => CommerceScreen(
               page: state.pathParameters['page']!,
-              id: state.pathParameters['id'])),
+              id: state.pathParameters['id'],
+              // A notification can ask for a specific tab, e.g. an inquiry
+              // message link opens the conversation rather than the request.
+              tab: state.uri.queryParameters['tab'])),
       GoRoute(
         path: '/photo-capture',
         name: 'photoCapture',

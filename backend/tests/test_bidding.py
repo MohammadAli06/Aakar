@@ -121,6 +121,13 @@ class BiddingTests(unittest.TestCase):
         s=self.create();self.clock+=timedelta(minutes=21)
         self.action(s,'reject')
         self.assertEqual(self.request('GET','/matches/product')['available_stock'],30)
+    def test_a_session_that_closes_without_offers_releases_stock(self):
+        self.create()
+        self.assertEqual(self.request('GET','/matches/product')['available_stock'],5)
+        self.clock+=timedelta(minutes=21)
+        # Nobody offered, so there is nothing to select; the lot is free again.
+        self.assertEqual(self.request('GET','/matches/product')['available_stock'],30)
+        self.assertEqual(self.create(quantity=30)['quantity'],30)
     def test_edit_is_future_only_and_validated(self):
         s=self.create()
         data={'product_id':'product','quantity':31,'min_price':200,'starts_at':s['starts_at'],'ends_at':s['ends_at'],'revision':s['revision']}

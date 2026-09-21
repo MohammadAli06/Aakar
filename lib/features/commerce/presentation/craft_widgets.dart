@@ -46,13 +46,21 @@ class CraftButton extends StatelessWidget {
   /// Stretch to the available width. Set false when placing the button in a Row,
   /// where an infinite-width box cannot be laid out.
   final bool expand;
+
+  /// Tighter side padding for a narrow inline slot (e.g. a paired home action
+  /// row), so the label stays on one line instead of puffing the button taller.
+  final bool compact;
   const CraftButton(this.label,
       {super.key,
       this.onPressed,
       this.icon,
       this.secondary = false,
       this.badge,
-      this.expand = true});
+      this.expand = true,
+      this.compact = false});
+
+  EdgeInsetsGeometry? get _padding =>
+      compact ? const EdgeInsets.symmetric(horizontal: 12) : null;
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -64,6 +72,7 @@ class CraftButton extends StatelessWidget {
                   onPressed: onPressed,
                   style: OutlinedButton.styleFrom(
                       minimumSize: const Size(0, 48),
+                      padding: _padding,
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10))),
                   child: Row(mainAxisSize: MainAxisSize.min, children: [
@@ -81,6 +90,7 @@ class CraftButton extends StatelessWidget {
                   onPressed: onPressed,
                   style: FilledButton.styleFrom(
                       minimumSize: const Size(0, 48),
+                      padding: _padding,
                       backgroundColor: const Color(0xFF285448),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10))),

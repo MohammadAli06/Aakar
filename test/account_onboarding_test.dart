@@ -79,7 +79,12 @@ void main() {
 
   Future<void> start(WidgetTester tester, Accounts accounts, String language,
       String route) async {
-    SharedPreferences.setMockInitialValues({});
+    SharedPreferences.setMockInitialValues({
+      // Seen already, so the first-run tour does not overlay the workspace tabs
+      // these tests drive.
+      'onboarding_seen_artisan': true,
+      'onboarding_seen_buyer': true,
+    });
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);

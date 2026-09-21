@@ -64,6 +64,14 @@ void main() {
 
   setUp(() => state = CommerceEngine.seed());
 
+  test('A message notification links straight to the inquiry chat', () {
+    inquire();
+    act('message', {'id': inquiryId, 'text': 'Hello'}, 'buyer');
+    final notice = records(state['notifications']).first;
+    expect(notice['role'], 'artisan');
+    expect(notice['link'], 'inquiry/$inquiryId?tab=chat');
+  });
+
   test('Availability changes only the owned product operational status', () {
     final before = copyRecord(state);
     for (final identity in [('buyer', 'buyer'), ('artisan', 'sakhi')]) {

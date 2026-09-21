@@ -7,6 +7,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/services/api_client.dart';
+import '../../../core/services/inquiry_service.dart';
+import '../../../core/services/notification_service.dart';
 import '../../../core/services/product_service.dart';
 import '../../../core/services/requirement_service.dart';
 import '../../../shared/models/account.dart';
@@ -17,22 +19,34 @@ final commerceProvider =
 
 /// Owns the commerce workspace.
 ///
-/// The artisan catalogue and the buyer's requirements live in the shared backend
-/// database and belong to the signed-in account, so `product`, `availability`,
-/// `publish` and `requirement` go through [ProductService] and
-/// [RequirementService]. The remaining flows (inquiries, quotes, orders,
-/// payments, shipping) still run on the local demo engine and are labelled as
-/// such in the UI; they are the next thing to move.
+/// The artisan catalogue, the buyer's requirements and the buyer↔artisan
+/// inquiry/quotation exchange live in the shared backend database and belong to
+/// the signed-in account, so `product`, `availability`, `publish`,
+/// `requirement`, `inquiry`, `capacity`, `quote`, `accept` and the conversation
+/// go through [ProductService]/[RequirementService]/[InquiryService]. Orders an
+/// accepted quotation creates are read from the backend; their production,
+/// payment, shipping and inspection steps still run on the local demo engine and
+/// are labelled as such in the UI.
 class CommerceRepository extends ChangeNotifier {
   CommerceRepository(
-      {ProductService? catalogue, RequirementService? requirements})
+      {ProductService? catalogue,
+      RequirementService? requirements,
+      InquiryService? inquiries,
+      OrderService? orders,
+      NotificationService? notifications})
       : _catalogue = catalogue ?? ProductService(),
-        _requirements = requirements ?? RequirementService() {
+        _requirements = requirements ?? RequirementService(),
+        _inquiries = inquiries ?? InquiryService(),
+        _orders = orders ?? OrderService(),
+        _notifications = notifications ?? NotificationService() {
     load();
   }
 
   final ProductService _catalogue;
   final RequirementService _requirements;
+  final InquiryService _inquiries;
+  final OrderService _orders;
+  final NotificationService _notifications;
 
   Record state = CommerceEngine.seed();
   String role = 'artisan';
@@ -69,8 +83,18 @@ class CommerceRepository extends ChangeNotifier {
       table('inquiries').where((r) => r['${role}_id'] == actor).toList();
   List<Record> get orders =>
       table('orders').where((r) => r['${role}_id'] == actor).toList();
+
+  /// The account's own notifications.
+  ///
+  /// A signed-in account reads only server rows for its user id; an offline
+  /// demo keeps its device-local rows. The two are never mixed, so the bell's
+  /// unread count cannot include a demo row the backend cannot mark read.
   List<Record> get notifications => table('notifications')
-      .where((r) => r['actor_id'] == actor && r['role'] == role)
+      .where((r) => signedIn
+          ? r['server'] == true &&
+              r['role'] == role &&
+              r['account_id'] == _accountId
+          : r['role'] == role && r['actor_id'] == actor)
       .toList();
   List<Record> get products => table('products')
       .where((r) => role == 'artisan'
@@ -89,10 +113,37 @@ class CommerceRepository extends ChangeNotifier {
       throw WorkflowError(
           'Disconnect the separate demo workspace before opening an account quotation');
     }
-    for (final entry in {'products': product, 'inquiries': inquiry}.entries) {
+    final inqCopy = copyRecord(inquiry);
+    if (inqCopy['capacity_status'] == 'pending' ||
+        inqCopy['capacity_status'] == null) {
+      inqCopy['capacity_status'] = 'confirmed';
+    }
+    inqCopy['confirmed_quantity'] ??= inqCopy['quantity'];
+    inqCopy['offered_lead_days'] ??= inqCopy['lead_days'];
+
+    for (final entry in {'products': product, 'inquiries': inqCopy}.entries) {
       final rows = table(entry.key);
-      if (!rows.any((row) => row['id'] == entry.value['id']))
+      final idx = rows.indexWhere((row) => row['id'] == entry.value['id']);
+      if (idx < 0) {
         rows.add(copyRecord(entry.value));
+      } else {
+        final existing = rows[idx];
+        final exQuotes = records(existing['quotes']);
+        final newQuotes = records(entry.value['quotes']);
+        rows[idx] = {
+          ...entry.value,
+          ...existing,
+          'quotes': newQuotes.length >= exQuotes.length ? newQuotes : exQuotes,
+          'capacity_status': (existing['capacity_status'] == 'confirmed' ||
+                  existing['capacity_status'] == 'partial')
+              ? existing['capacity_status']
+              : entry.value['capacity_status'],
+          'confirmed_quantity': existing['confirmed_quantity'] ??
+              entry.value['confirmed_quantity'],
+          'offered_lead_days':
+              existing['offered_lead_days'] ?? entry.value['offered_lead_days'],
+        };
+      }
       state[entry.key] = rows;
     }
     final profiles = table('profiles');
@@ -161,7 +212,8 @@ class CommerceRepository extends ChangeNotifier {
   /// identity is the server's, and the catalogue is loaded from the backend.
   Future<void> applyAccount(Account account) async {
     final name = account.role.name;
-    if (_accountId == account.id && role == name) return;
+    final sameAccount = _accountId == account.id && role == name;
+    if (sameAccount && _storedLanguage(actor) == account.languagePref) return;
     _accountId = account.id;
     role = name;
     final profileId = '${account.profile['id'] ?? ''}';
@@ -169,7 +221,16 @@ class CommerceRepository extends ChangeNotifier {
     _rememberProfile(account);
     await _persist();
     notifyListeners();
-    await hydrate();
+    // A language change only rewrites the local profile row the offline demo
+    // bridge reads; the shared records do not need fetching again for it.
+    if (!sameAccount) await hydrate();
+  }
+
+  String _storedLanguage(String id) {
+    for (final p in table('profiles')) {
+      if (p['id'] == id) return '${p['language_pref'] ?? ''}';
+    }
+    return '';
   }
 
   /// Keeps a displayable profile row for the signed-in account so the commerce
@@ -195,6 +256,7 @@ class CommerceRepository extends ChangeNotifier {
           ? 'verified'
           : '${existing?['verification'] ?? 'not_submitted'}',
       'phone': account.phone ?? '',
+      'language_pref': account.languagePref,
       'document': '${existing?['document'] ?? ''}',
     };
     if (index < 0) {
@@ -221,22 +283,85 @@ class CommerceRepository extends ChangeNotifier {
       _adopt(role == 'buyer'
           ? await _catalogue.published()
           : await _catalogue.mine());
-      if (role == 'buyer') _adoptRequirements(await _requirements.mine());
-      error = null;
-      notifyListeners();
-      return true;
     } on ApiError catch (e) {
       error = e.detail ??
           'The shared records could not be loaded. Check that the backend is reachable.';
+      notifyListeners();
+      return false;
     } catch (_) {
       error = 'The shared records could not be loaded.';
+      notifyListeners();
+      return false;
     }
+    // Requirements, inquiries and orders are separate endpoints. Loading them
+    // one by one keeps a single failing endpoint from blanking the records the
+    // others already returned (e.g. an older backend with no orders table).
+    var complete = true;
+    if (role == 'buyer') {
+      if (!await _adoptSafely(_requirements.mine, _adoptRequirements))
+        complete = false;
+    }
+    if (!await _adoptSafely(_inquiries.mine, _adoptInquiries)) complete = false;
+    if (!await _adoptSafely(_orders.mine, _adoptOrders)) complete = false;
+    if (!await _adoptSafely(_notifications.mine, _adoptNotifications)) {
+      complete = false;
+    }
+    error = complete ? null : 'Some shared records could not be refreshed.';
     notifyListeners();
-    return false;
+    return complete;
+  }
+
+  /// Adopts one collection on its own; a failure leaves the current rows alone.
+  Future<bool> _adoptSafely(Future<List<Map<String, dynamic>>> Function() fetch,
+      void Function(List<Map<String, dynamic>>) adopt) async {
+    try {
+      adopt(await fetch());
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   void _adoptRequirements(List<Map<String, dynamic>> rows) {
     state['requirements'] = rows
+        .map((row) => Map<String, dynamic>.from(row)..['server'] = true)
+        .toList();
+  }
+
+  /// The signed-in account's inquiries. Server rows from the DB are authoritative.
+  /// Device-local inquiries are filtered out to prevent deleted DB records from persisting.
+  /// Only real bidding session handoffs (id starts with 'bid-') are preserved.
+  void _adoptInquiries(List<Map<String, dynamic>> rows) {
+    final shared = rows
+        .map((row) => Map<String, dynamic>.from(row)..['server'] = true)
+        .toList();
+    final sharedIds = shared.map((r) => '${r['id']}').toSet();
+    final localBidding = table('inquiries')
+        .where((row) =>
+            !sharedIds.contains('${row['id']}') &&
+            '${row['id']}'.startsWith('bid-'))
+        .toList();
+    state['inquiries'] = [...shared, ...localBidding];
+  }
+
+  /// Orders created by accepting a shared quotation, plus any active bidding order.
+  void _adoptOrders(List<Map<String, dynamic>> rows) {
+    final shared = rows
+        .map((row) => Map<String, dynamic>.from(row)..['server'] = true)
+        .toList();
+    final sharedIds = shared.map((r) => '${r['id']}').toSet();
+    final localBidding = table('orders')
+        .where((row) =>
+            !sharedIds.contains('${row['id']}') &&
+            '${row['id']}'.startsWith('bid-'))
+        .toList();
+    state['orders'] = [...shared, ...localBidding];
+  }
+
+  /// The account's notifications. Server rows are authoritative; a signed-in
+  /// account has no device-local demo notifications to merge in.
+  void _adoptNotifications(List<Map<String, dynamic>> rows) {
+    state['notifications'] = rows
         .map((row) => Map<String, dynamic>.from(row)..['server'] = true)
         .toList();
   }
@@ -322,9 +447,36 @@ class CommerceRepository extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Product and requirement actions the shared backend owns.
+  /// Product, requirement and inquiry actions the shared backend owns.
   static const _catalogueActions = {'product', 'availability', 'publish'};
   static const _requirementActions = {'requirement'};
+
+  /// Order lifecycle actions — artisan-side mutations route to PATCH /orders/{id}/*
+  static const _orderActions = {
+    'order_accept',
+    'order_decline',
+    'production_plan',
+    'production_progress',
+    'production_complete',
+    'packaging',
+    'dispatch_order',
+    'delivery_status',
+    // Settlement and closure belong to the shared order too, so a recorded
+    // payment or an accepted inspection survives a refresh.
+    'pay',
+    'inspection',
+    'complete',
+  };
+  static const _inquiryActions = {
+    'inquiry',
+    'message',
+    'capacity',
+    'quote',
+    'accept',
+    'reject_quote',
+    'request_change',
+    'sample'
+  };
 
   /// Only records that came from the backend (or a brand new one) are handled
   /// there; the on-device demo records stay on the local engine until the shared
@@ -350,6 +502,22 @@ class CommerceRepository extends ChangeNotifier {
           _serverOwned('requirements', input)) {
         await _requirementAct(input);
         await hydrate();
+      } else if (signedIn &&
+          _inquiryActions.contains(action) &&
+          (action == 'inquiry' || _serverOwned('inquiries', input))) {
+        // A buyer's inquiry and everything the two participants do on it belong
+        // to the shared record, so the artisan sees the same conversation.
+        await _inquiryAct(action, input);
+        await hydrate();
+      } else if (signedIn &&
+          _orderActions.contains(action) &&
+          _serverOwned('orders', input)) {
+        // Artisan order lifecycle mutations route to dedicated PATCH endpoints.
+        await _orderAct(action, input);
+        await hydrate();
+      } else if (signedIn && action == 'read_notifications') {
+        // The bell's "mark all as read" belongs to the account, not the device.
+        _adoptNotifications(await _notifications.markAllRead());
       } else if (connected) {
         input = Map.of(input);
         final documents = await getApplicationDocumentsDirectory();
@@ -436,6 +604,171 @@ class CommerceRepository extends ChangeNotifier {
     draft['reference_image'] =
         await _requirements.resolveImage('${input['reference_image'] ?? ''}');
     await _requirements.create(draft);
+  }
+
+  /// Inquiry, capacity, message and quotation actions the shared backend owns.
+  /// The on-device demo workspace keeps its own copy while nobody is signed in.
+  Future<void> _inquiryAct(String action, Record input) async {
+    final id = '${input['id'] ?? ''}';
+    switch (action) {
+      case 'inquiry':
+        final draft = Map<String, dynamic>.from(input)..remove('id');
+        draft['reference_image'] = await _requirements
+            .resolveImage('${input['reference_image'] ?? ''}');
+        await _inquiries.create(draft);
+      case 'message':
+        await _inquiries.act(id, 'messages', {
+          'text': input['text'],
+          'translation': input['translation'],
+          'attachment': input['attachment'],
+          'provenance': input['provenance'],
+          'target_language': input['target_language'],
+        });
+      case 'capacity':
+        await _inquiries.act(id, 'capacity', {
+          'status': input['status'],
+          'quantity': input['quantity'],
+          'lead_days': input['lead_days'],
+        });
+      case 'quote':
+        await _inquiries.act(
+            id, 'quote', Map<String, dynamic>.from(input)..remove('id'));
+      case 'accept':
+        await _inquiries.act(id, 'accept', {'quote_id': input['quote_id']});
+      case 'reject_quote':
+        await _inquiries.act(id, 'reject', {});
+      case 'request_change':
+        await _inquiries.act(id, 'request-change',
+            Map<String, dynamic>.from(input)..remove('id'));
+      case 'sample':
+        await _inquiries.act(id, 'sample', {
+          'status': input['status'],
+          'evidence': input['evidence'],
+          'terms': input['terms'],
+          'note': input['note'],
+        });
+    }
+  }
+
+  /// Routes artisan order lifecycle actions to the PATCH /orders/{id}/* endpoints.
+  Future<void> _orderAct(String action, Record input) async {
+    final id = '${input['id'] ?? ''}';
+    if (id.isEmpty) throw WorkflowError('Order id is required');
+    // These go through the account client (Firebase token + API base URL), not
+    // the demo workspace client: `endpoint`/`token` are only set when a demo
+    // workspace is connected, so a signed-in artisan would otherwise call a
+    // relative URL with no host.
+    switch (action) {
+      case 'order_accept':
+        await _orders.act(id, 'accept', {'accepted': true});
+      case 'order_decline':
+        await _orders.act(id, 'accept', {'accepted': false});
+      case 'production_plan':
+        await _orders.act(id, 'production-plan', {
+          'prod_start_date': input['prod_start_date'],
+          'prod_completion_date': input['prod_completion_date'],
+          if (input['daily_target'] != null)
+            'daily_target': '${input['daily_target']}',
+        });
+      case 'production_progress':
+        await _orders.act(id, 'production-progress', {
+          'milestone': input['milestone'],
+          'completed_units': input['completed_units'] ?? 0,
+          if (input['note'] != null) 'note': input['note'],
+          if (input['photo_url'] != null) 'photo_url': input['photo_url'],
+        });
+      case 'production_complete':
+        await _orders.act(id, 'production-complete',
+            {'completed_units': input['completed_units'] ?? 0});
+      case 'packaging':
+        await _orders.act(id, 'packaging', {
+          'packaging_type': input['packaging_type'],
+          'num_boxes': input['num_boxes'] ?? 1,
+          if (input['total_weight'] != null)
+            'total_weight': '${input['total_weight']}',
+          if (input['packaging_photo'] != null)
+            'packaging_photo': input['packaging_photo'],
+        });
+      case 'dispatch_order':
+        await _orders.act(id, 'dispatch', {
+          'courier': input['courier'],
+          'awb_number': input['awb_number'],
+          'dispatch_date': input['dispatch_date'],
+          'estimated_delivery': input['estimated_delivery'],
+        });
+      case 'delivery_status':
+        await _orders.act(id, 'delivery-status', {'status': input['status']});
+      case 'pay':
+        await _orders.act(id, 'pay', {
+          'milestone_id': input['milestone_id'],
+          if (input['reference'] != null) 'reference': '${input['reference']}',
+        });
+      case 'inspection':
+        await _orders.act(id, 'inspection', {
+          'quantity': input['quantity'] ?? 0,
+          if (input['note'] != null) 'note': '${input['note']}',
+        });
+      case 'complete':
+        await _orders.act(id, 'complete', {});
+    }
+  }
+
+  Future<Record> previewMessage(String text,
+      {Record? inquiry, String? productId}) async {
+    if (signedIn && (inquiry == null || inquiry['server'] == true)) {
+      return _inquiries.preview(text,
+          inquiryId: inquiry?['id'] as String?, productId: productId);
+    }
+    final otherRole = role == 'buyer' ? 'artisan' : 'buyer';
+    final source = profile['language_pref'];
+    final target = lookup('profiles',
+            '${inquiry?['${otherRole}_id'] ?? lookup('products', productId)?['artisan_id']}')?[
+        'language_pref'];
+    if (source == target && source != null) {
+      return {'text': text, 'translation': '', 'status': 'same_language'};
+    }
+    if (!['en', 'hi'].contains(source) || !['en', 'hi'].contains(target)) {
+      return {'text': text, 'translation': '', 'status': 'unavailable'};
+    }
+    final result = await assist('translate', text, '$target');
+    final translation = '${result['fields']?['translation'] ?? ''}';
+    return {
+      'text': text,
+      'translation': translation,
+      'target_language': target,
+      'status': translation.isEmpty ? 'unavailable' : 'review_required'
+    };
+  }
+
+  Future<void> sendVoice(Record inquiry, String path) async {
+    if (busy) throw WorkflowError('Please wait for the workspace');
+    if (inquiry['server'] != true || !signedIn) {
+      throw WorkflowError('Voice notes require a shared account inquiry.');
+    }
+    busy = true;
+    notifyListeners();
+    try {
+      final row = await _inquiries.voice('${inquiry['id']}', path);
+      state['inquiries'] = table('inquiries')
+          .map((r) => r['id'] == row['id'] ? row : r)
+          .toList();
+      await _persist();
+    } finally {
+      busy = false;
+      notifyListeners();
+    }
+  }
+
+  Future<Uint8List> voiceBytes(String id, String name) =>
+      _inquiries.voiceBytes(id, name);
+
+  Future<void> refreshInquiry(String id) async {
+    if (busy || !signedIn || lookup('inquiries', id)?['server'] != true) return;
+    final row = await _inquiries.get(id);
+    if (busy) return;
+    state['inquiries'] =
+        table('inquiries').map((r) => r['id'] == id ? row : r).toList();
+    notifyListeners();
   }
 
   Future<Record> assist(String task, String text, String language) async {

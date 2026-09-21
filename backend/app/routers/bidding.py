@@ -1,4 +1,4 @@
-﻿"""Account-owned sealed bidding. All time and visibility decisions are server-side."""
+"""Account-owned sealed bidding. All time and visibility decisions are server-side."""
 import copy
 import re
 import uuid
@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import Base, get_db
 from app.core.auth_deps import get_current_user, require_artisan_profile
-from app.models.models import User, Artisan, Buyer, Requirement, Product, ProductListing, PriceRecommendation
+from app.models.models import User, Artisan, Buyer, Requirement, Product, ProductListing, PriceRecommendation, Inquiry
 
 
 class BiddingSession(Base):
@@ -104,9 +104,16 @@ async def available_stock(db, product, exclude=None):
     sessions = (await db.scalars(select(BiddingSession).where(BiddingSession.product_id == product['id']))).all()
     reserved = 0
     for session in sessions:
-        if session.id == exclude or phase(session.data) in ('cancelled', 'rejected'):
+        if session.id == exclude:
             continue
-        reserved += sum(session.data.get('allocations', {}).values()) if phase(session.data) in ('selected', 'quotation') else session.data['quantity']
+        status = phase(session.data)
+        if status in ('cancelled', 'rejected'):
+            continue
+        # A session that ended with no offers has nothing left to decide, so it
+        # must not keep holding the lot back from the next one.
+        if status == 'closed' and not session.data.get('offers'):
+            continue
+        reserved += sum(session.data.get('allocations', {}).values()) if status in ('selected', 'quotation') else session.data['quantity']
     return max(0, int(float(product.get('stock', 0))) - reserved)
 
 
@@ -130,6 +137,13 @@ def visible(row, user):
     data['buyer_count'] = len(data['buyers'])
     data['offers'] = list(offers.values()) if owner and status in ('closed', 'selected', 'quotation', 'rejected') else []
     data['my_offer'] = offers.get(user.id) if not owner else None
+    for inq in data.get('inquiries', []):
+        if inq.get('capacity_status') == 'pending' or not inq.get('capacity_status'):
+            inq['capacity_status'] = 'confirmed'
+        if not inq.get('confirmed_quantity'):
+            inq['confirmed_quantity'] = inq.get('quantity')
+        if not inq.get('offered_lead_days'):
+            inq['offered_lead_days'] = inq.get('lead_days')
     if not owner:
         data['product'].pop('cost_floor', None)
         data['buyers'] = [b for b in data['buyers'] if b['id'] == user.id]
@@ -141,6 +155,21 @@ def visible(row, user):
 @router.get('')
 async def sessions(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     rows = (await db.scalars(select(BiddingSession))).all()
+    for r in rows:
+        inquiries = r.data.get('inquiries', [])
+        if inquiries:
+            inq_ids = [inq['id'] for inq in inquiries if 'id' in inq]
+            if inq_ids:
+                db_inqs = (await db.scalars(select(Inquiry).where(Inquiry.id.in_(inq_ids)))).all()
+                db_map = {inq.id: inq for inq in db_inqs}
+                for inq in inquiries:
+                    db_inq = db_map.get(inq['id'])
+                    if db_inq:
+                        inq['capacity_status'] = db_inq.capacity_status
+                        inq['confirmed_quantity'] = db_inq.confirmed_quantity or inq.get('quantity')
+                        inq['offered_lead_days'] = db_inq.offered_lead_days or inq.get('lead_days')
+                        inq['quotes'] = list(db_inq.quotes or [])
+                        inq['status'] = db_inq.status
     return [visible(r, user) for r in rows if r.owner_id == user.id or any(b['id'] == user.id for b in r.data['buyers'])]
 
 
@@ -246,15 +275,49 @@ async def act(session_id: str, action: Action, user: User = Depends(get_current_
                 for bidder, quantity in data['allocations'].items():
                     offer = data['offers'][bidder]
                     match = next(b for b in data['buyers'] if b['id'] == bidder)
-                    data['inquiries'].append({'id': 'bid-' + row.id + '-' + bidder,
+                    inq_id = 'bid-' + row.id + '-' + bidder
+                    data['inquiries'].append({'id': inq_id,
                         'bidding_session_id': row.id, 'product_id': row.product_id,
                         'artisan_id': data['product']['artisan_id'], 'buyer_id': bidder,
                         'buyer_name': match['name'], 'product_title': data['product']['title'],
                         'quantity': quantity, 'budget': offer['price'], 'lead_days': match['lead_days'],
                         'location': match['location'], 'sample_required': match['sample_required'],
                         'sample_status': 'requested' if match['sample_required'] else 'not_required',
-                        'status': 'sent', 'capacity_status': 'pending', 'messages': [], 'quotes': [], 'events': [],
+                        'status': 'sent', 'capacity_status': 'confirmed',
+                        'confirmed_quantity': quantity, 'offered_lead_days': match['lead_days'],
+                        'messages': [], 'quotes': [], 'events': [
+                            {'name': 'Capacity confirmed (Bidding Allocation)', 'actor': user.id, 'role': 'artisan', 'time': now().isoformat()}
+                        ],
                         'time': now().isoformat(), 'specifications': offer['note']})
+
+                    db_inq = await db.get(Inquiry, inq_id)
+                    if db_inq is None:
+                        db_inq = Inquiry(
+                            id=inq_id,
+                            buyer_id=bidder,
+                            artisan_id=data['product']['artisan_id'],
+                            product_id=row.product_id,
+                            product_title=data['product']['title'],
+                            quantity=quantity,
+                            lead_days=match['lead_days'],
+                            budget=offer['price'],
+                            location=match['location'],
+                            sample_required=bool(match['sample_required']),
+                            sample_status='requested' if match['sample_required'] else 'not_required',
+                            status='sent',
+                            capacity_status='confirmed',
+                            confirmed_quantity=quantity,
+                            offered_lead_days=match['lead_days'],
+                            specifications=offer['note'],
+                            messages=[],
+                            quotes=[],
+                            events=[{'name': 'Capacity confirmed (Bidding Allocation)', 'actor': user.id, 'role': 'artisan', 'time': now().isoformat()}],
+                        )
+                        db.add(db_inq)
+                    else:
+                        db_inq.capacity_status = 'confirmed'
+                        db_inq.confirmed_quantity = quantity
+                        db_inq.offered_lead_days = match['lead_days']
                 data['outcome'] = 'quotation'
     await save(db, row, data, action.revision)
     return visible(row, user)

@@ -256,32 +256,143 @@ class CommerceEngine {
         .map((p) {
       final reasons = <String>[];
       final gaps = <String>[];
+
+      // 1. Text normalization & multilingual dictionary for craft terms
       var query = '${request['product'] ?? ''}'.toLowerCase();
-      for (final term in {
+      final translations = {
         'बाँस': 'bamboo',
         'बांस': 'bamboo',
         'टोकरी': 'basket',
+        'डालिया': 'basket',
         'मिट्टी': 'clay',
+        'टेराकोटा': 'terracotta',
         'कपास': 'cotton',
+        'सूती': 'cotton',
+        'कपड़ा': 'fabric',
+        'कपडे': 'fabric',
+        'कपड़े': 'fabric',
+        'साड़ी': 'saree',
         'बैग': 'bag',
-        'गमला': 'planter'
-      }.entries) {
+        'थैला': 'bag',
+        'गमला': 'planter',
+        'दीया': 'diya',
+        'दीपक': 'diya',
+        'पीतल': 'brass',
+        'धातु': 'metal',
+        'लकड़ी': 'wood',
+        'सिरेमिक': 'ceramic',
+        'मग': 'mug',
+        'कप': 'cup',
+        'बर्तन': 'pot',
+        'हथकरघा': 'handloom',
+        'कढ़ाई': 'embroidery',
+        'कारीगरी': 'handcrafted',
+      };
+      for (final term in translations.entries) {
         query = query.replaceAll(term.key, term.value);
       }
-      final words = query
-          .split(RegExp(r'[\s,.;!?]+'))
-          .where((w) => w.length > 2)
+
+      // Filter common English & Hindi stop words that shouldn't dilute matching
+      const stopWords = {
+        'ka',
+        'ki',
+        'ke',
+        'ko',
+        'me',
+        'mein',
+        'se',
+        'aur',
+        'or',
+        'for',
+        'with',
+        'the',
+        'of',
+        'in',
+        'and',
+        'to',
+        'a',
+        'an',
+        'का',
+        'की',
+        'के',
+        'को',
+        'में',
+        'से',
+        'और'
+      };
+
+      final queryWords = query
+          .split(RegExp(r'[\s,.;:!?/()\[\]\-]+'))
+          .where((w) => w.length > 1 && !stopWords.contains(w))
           .toList();
-      final description =
-          '${p['title']} ${p['category']} ${p['material']} ${p['craft']}'
-              .toLowerCase();
-      final productFit = words.isEmpty || words.any(description.contains);
-      (productFit ? reasons : gaps).add(
-          productFit ? 'Product and craft fit' : 'Different product / craft');
+
+      final title = '${p['title'] ?? ''}'.toLowerCase();
+      final category = '${p['category'] ?? ''}'.toLowerCase();
+      final material = '${p['material'] ?? ''}'.toLowerCase();
+      final craft = '${p['craft'] ?? ''}'.toLowerCase();
+      final description = '${p['description'] ?? ''}'.toLowerCase();
+
+      // Priority 1: Title matching (highest weight - 45 pts)
+      double titleScore = 0.0;
+      if (queryWords.isEmpty) {
+        titleScore = 1.0;
+      } else {
+        int titleHits = 0;
+        for (final qw in queryWords) {
+          if (title.contains(qw)) {
+            titleHits += 2; // Direct title match gets double weight
+          } else if (category.contains(qw) ||
+              material.contains(qw) ||
+              craft.contains(qw)) {
+            titleHits += 1;
+          } else if (description.contains(qw)) {
+            titleHits += 1;
+          }
+        }
+        titleScore = (titleHits / (queryWords.length * 1.5)).clamp(0.0, 1.0);
+      }
+
+      final productFit = queryWords.isEmpty || titleScore > 0;
+      if (productFit) {
+        if (titleScore >= 0.5) {
+          reasons.add('Strong title & craft match');
+        } else {
+          reasons.add('Related product & craft category');
+        }
+      } else {
+        gaps.add('Different product / craft category');
+      }
+
       void check(bool ok, String yes, String no) =>
           (ok ? reasons : gaps).add(ok ? yes : no);
-      check(number(request['quantity']) >= number(p['moq']),
-          'Meets minimum order', 'Below MOQ');
+
+      // Priority 2: Budget & Price fit (weight - 15 pts)
+      final reqBudget = number(request['budget']);
+      final prodPrice = number(p['price']);
+      double priceScore = 1.0;
+      if (reqBudget > 0) {
+        if (prodPrice <= reqBudget) {
+          priceScore = 1.0;
+          check(
+              true,
+              'Within unit budget (₹${prodPrice.toInt()} ≤ ₹${reqBudget.toInt()})',
+              '');
+        } else {
+          final diffRatio = (prodPrice - reqBudget) / reqBudget;
+          priceScore = max(0.0, 1.0 - diffRatio);
+          check(
+              false, '', 'Above unit budget by ${(diffRatio * 100).toInt()}%');
+        }
+      } else {
+        reasons.add('Price: ₹${prodPrice.toInt()}/unit (negotiable)');
+      }
+
+      // Priority 3: Quantity, MOQ & Capacity (weight - 15 pts)
+      final reqQuantity = number(request['quantity']);
+      final pMoq = number(p['moq']);
+      check(reqQuantity >= pMoq, 'Meets minimum order quantity (MOQ: $pMoq)',
+          'Below minimum order quantity ($pMoq)');
+
       final committed = records(state['orders'])
           .where(
               (o) => o['product_id'] == p['id'] && o['status'] != 'completed')
@@ -291,28 +402,71 @@ class CommerceEngine {
           number(p['stock']) +
               number(p['capacity']) * number(request['lead_days'], 30) / 30 -
               committed);
-      check(possible >= number(request['quantity']),
-          'Quantity and capacity available', 'Partial capacity only');
-      check(number(p['lead_days']) <= number(request['lead_days'], 30),
-          'Within requested lead time', 'Lead time needs negotiation');
-      check(
-          number(request['budget']) == 0 ||
-              number(p['price']) <= number(request['budget']),
-          'Within unit budget',
-          'Above unit budget');
-      check(
-          '${request['customization'] ?? ''}'.isEmpty ||
-              p['customizable'] == true,
-          'Customization fit',
-          'Customization not available');
+      final hasCapacity = possible >= reqQuantity;
+      check(hasCapacity, 'Quantity and production capacity available',
+          'Partial capacity only (${possible.floor()} units available)');
+
+      // Priority 4: Lead time & Delivery Timeline (weight - 15 pts)
+      final reqLead = number(request['lead_days'], 30);
+      final prodLead = number(p['lead_days']);
+      double leadScore = 1.0;
+      if (prodLead <= reqLead) {
+        check(true,
+            'Within requested lead time ($prodLead days ≤ $reqLead days)', '');
+      } else {
+        final diff = prodLead - reqLead;
+        leadScore = max(0.0, 1.0 - (diff / reqLead));
+        check(false, '',
+            'Lead time needs negotiation ($prodLead days needed vs $reqLead days requested)');
+      }
+
+      // Priority 5: Delivery Location Match (weight - 10 pts)
+      final reqLoc = '${request['location'] ?? ''}'.trim().toLowerCase();
+      final prodLoc = '${p['location'] ?? ''}'.trim().toLowerCase();
+      double locScore = 0.5; // neutral baseline
+      if (reqLoc.isNotEmpty && prodLoc.isNotEmpty) {
+        final reqLocWords =
+            reqLoc.split(RegExp(r'[\s,]+')).where((w) => w.length > 2);
+        final sameRegion = reqLocWords.any((w) => prodLoc.contains(w));
+        if (sameRegion) {
+          locScore = 1.0;
+          reasons.add('Nearby location match: ${p['location']}');
+        } else {
+          locScore = 0.7;
+          reasons
+              .add('Delivery from ${p['location']} to ${request['location']}');
+        }
+      }
+
+      // Availability check
       check(p['available'] == true, 'Supplier available',
           'Currently unavailable');
-      if ('${request['location'] ?? ''}'.isNotEmpty)
-        reasons.add(
-            '${p['location']} to ${request['location']}; delivery serviceability needs confirmation');
+
+      // Customization check
+      final hasCustReq = '${request['customization'] ?? ''}'.trim().isNotEmpty;
+      if (hasCustReq) {
+        check(p['customizable'] == true, 'Customization supported',
+            'Customization not available');
+      }
+
+      // Calculate composite score (0 - 100)
+      // 45% Title/Product fit + 15% Price + 15% Capacity/MOQ + 15% Lead Time + 10% Location
+      double compositeScore = (titleScore * 45) +
+          (priceScore * 15) +
+          ((reqQuantity >= pMoq && hasCapacity ? 1.0 : 0.4) * 15) +
+          (leadScore * 15) +
+          (locScore * 10);
+
+      // Deduct heavily if supplier is completely unavailable
+      if (p['available'] != true) {
+        compositeScore = min(compositeScore, 40.0);
+      }
+
+      final finalScore = compositeScore.round().clamp(10, 99);
+
       return {
         ...p,
-        'match_score': ((7 - gaps.length) / 7 * 100).round(),
+        'match_score': finalScore,
         'reasons': reasons,
         'gaps': gaps,
         'feasible': gaps.isEmpty,
@@ -617,7 +771,7 @@ class CommerceEngine {
             'New message · ${r['product_title']}',
             '${r[role == 'buyer' ? 'artisan_id' : 'buyer_id']}',
             role == 'buyer' ? 'artisan' : 'buyer',
-            'inquiry/${r['id']}');
+            'inquiry/${r['id']}?tab=chat');
         break;
       case 'capacity':
         asRole('artisan');
@@ -674,11 +828,18 @@ class CommerceEngine {
       case 'quote':
         final r = inquiry();
         require(r['status'] != 'ordered', 'Order terms are already agreed');
+        if (r['capacity_status'] == 'pending' &&
+            r['bidding_session_id'] != null) {
+          r['capacity_status'] = 'confirmed';
+        }
+        r['confirmed_quantity'] ??= r['quantity'];
+        r['offered_lead_days'] ??= r['lead_days'];
         require(['confirmed', 'partial'].contains(r['capacity_status']),
             'Artisan must confirm capacity first');
         final p = find('products', r['product_id']);
+        final minMoq = r['bidding_session_id'] != null ? 1 : number(p['moq']);
         require(
-            number(input['quantity']) >= number(p['moq']) &&
+            number(input['quantity']) >= minMoq &&
                 number(input['quantity']) <= number(r['confirmed_quantity']),
             'Quantity must satisfy MOQ and confirmed capacity');
         require(number(input['unit_price']) >= floor(p),
@@ -743,6 +904,7 @@ class CommerceEngine {
         };
         quotes.add(q);
         r['status'] = 'negotiating';
+        r['capacity_status'] = 'confirmed';
         event(r, 'Quote v${q['version']} proposed');
         notify(
             'Quote v${q['version']} · ${r['product_title']}',

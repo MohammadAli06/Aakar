@@ -109,6 +109,9 @@ void main() {
         SharedPreferences.setMockInitialValues({
           'commerce_state_v1': jsonEncode(state),
           'commerce_role': artisan ? 'artisan' : 'buyer',
+          // Seen already, so the first-run tour does not overlay these screens.
+          'onboarding_seen_artisan': true,
+          'onboarding_seen_buyer': true,
         });
         final container = ProviderContainer(overrides: [
           selectedLanguageProvider.overrideWith((ref) => language),
@@ -199,7 +202,10 @@ void main() {
         pageState['saved'] = ['buyer-test:ramesh'];
         SharedPreferences.setMockInitialValues({
           'commerce_state_v1': jsonEncode(pageState),
-          'commerce_role': 'buyer'
+          'commerce_role': 'buyer',
+          // Seen already, so the first-run tour does not overlay these screens.
+          'onboarding_seen_artisan': true,
+          'onboarding_seen_buyer': true,
         });
         final container = ProviderContainer(overrides: [
           selectedLanguageProvider.overrideWith((ref) => language),

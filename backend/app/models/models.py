@@ -160,6 +160,82 @@ class Requirement(Base):
 
 
 
+# ── Inquiry (buyer → artisan request for quotation) ───────────────────────
+# A buyer's inquiry against one published product, owned by both participants.
+# The conversation, the artisan's capacity answer and every quotation version
+# live here so both accounts read the same record instead of a device-local copy.
+class Inquiry(Base):
+    __tablename__ = "inquiries"
+
+    id = Column(String, primary_key=True, default=_uuid)
+    buyer_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    artisan_id = Column(String, ForeignKey("artisans.id"), nullable=False, index=True)
+    product_id = Column(String, ForeignKey("products.id"), nullable=False, index=True)
+    product_title = Column(String(300), nullable=False, default='')
+    quantity = Column(Float, nullable=False)
+    lead_days = Column(Float, nullable=False)
+    budget = Column(Float, default=0.0)
+    location = Column(String(300), nullable=False, default='')
+    target_date = Column(String(40), nullable=True)
+    customization = Column(Text, nullable=True)
+    specifications = Column(Text, nullable=True)
+    packaging = Column(String(300), nullable=True)
+    reference_image = Column(String(500), nullable=True)
+    requirement_id = Column(String, nullable=True)
+    capacity_status = Column(String(20), nullable=False, default='pending')
+    confirmed_quantity = Column(Float, nullable=True)
+    offered_lead_days = Column(Float, nullable=True)
+    sample_required = Column(Boolean, default=False)
+    sample_status = Column(String(30), nullable=False, default='not_required')
+    sample_evidence = Column(String(500), nullable=True)
+    sample_terms = Column(Text, nullable=True)
+    sample_note = Column(Text, nullable=True)
+    sample_basis = Column(JSON, nullable=True)
+    status = Column(String(30), nullable=False, default='sent')   # sent | negotiating | ordered
+    order_id = Column(String, nullable=True)
+    messages = Column(JSON, nullable=False, default=list)
+    quotes = Column(JSON, nullable=False, default=list)
+    events = Column(JSON, nullable=False, default=list)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+# ── Order ─────────────────────────────────────────────────────────────────
+# Created when the other participant accepts an open quotation. The flat record
+# the order screens render is stored as one JSON document plus the columns the
+# two accounts are queried by.
+class Order(Base):
+    __tablename__ = "orders"
+
+    id = Column(String, primary_key=True, default=_uuid)
+    inquiry_id = Column(String, nullable=False, index=True)
+    buyer_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    artisan_id = Column(String, ForeignKey("artisans.id"), nullable=False, index=True)
+    product_id = Column(String, nullable=False, index=True)
+    product_title = Column(String(300), nullable=False, default='')
+    status = Column(String(30), nullable=False, default='confirmed')
+    payload = Column(JSON, nullable=False, default=dict)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+# ── Notifications ─────────────────────────────────────────────────────────
+# One row per recipient. Created when the other participant acts on something
+# shared with them (currently an inquiry message), so the bell has something
+# account-scoped to show instead of a device-local list.
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id = Column(String, primary_key=True, default=_uuid)
+    recipient_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    role = Column(String(20), nullable=False)          # recipient's role
+    title = Column(String(300), nullable=False)
+    link = Column(String(300), nullable=True)          # e.g. inquiry/<id>?tab=chat
+    category = Column(String(30), nullable=False, default='Others')
+    read = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+
 class Product(Base):
     __tablename__ = "products"
 

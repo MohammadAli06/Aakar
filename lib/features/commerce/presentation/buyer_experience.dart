@@ -207,14 +207,51 @@ extension _BuyerExperience on _CommerceScreenState {
 
   List<Widget> completedActions(Record o) => [
         CraftCard(
-            color: const Color(0xFFE6F1E8),
+            color: const Color(0xFFF3F8F4),
             child: Column(children: [
-              const Icon(Icons.check_circle_outline,
-                  size: 58, color: Color(0xFF285448)),
-              title('Order completed!', 'ऑर्डर पूरा हुआ!'),
-              Text('${o['product_title']} · ${o['quantity']}'),
-              Text(t('Thank you for supporting handmade craft.',
-                  'हस्तशिल्प का साथ देने के लिए धन्यवाद।')),
+              Container(
+                  width: 60,
+                  height: 60,
+                  decoration: const BoxDecoration(
+                      shape: BoxShape.circle, color: Color(0xFF285448)),
+                  child:
+                      const Icon(Icons.check, size: 36, color: Colors.white)),
+              const SizedBox(height: 12),
+              Text(t('Order Completed!', 'ऑर्डर पूरा हुआ!'),
+                  style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF285448))),
+              const SizedBox(height: 4),
+              Text('Order #${o['id']}',
+                  style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF6B6B6B))),
+              const SizedBox(height: 4),
+              Text(
+                  '${o['product_title']} · ${o['quantity']} ${t('units', 'इकाइयाँ')}',
+                  style: const TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 10),
+              Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFDCE8DF))),
+                  child: Row(children: [
+                    const Icon(Icons.celebration_outlined,
+                        size: 20, color: Color(0xFF285448)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                        child: Text(
+                            t('Thank you for supporting Indian artisans. Your order has been successfully delivered.',
+                                'भारतीय कारीगरों का समर्थन करने के लिए धन्यवाद। आपका ऑर्डर सफलतापूर्वक डिलीवर हो गया है।'),
+                            style: const TextStyle(fontSize: 11, height: 1.4))),
+                  ])),
+              const SizedBox(height: 14),
               CraftButton(t('Reorder', 'फिर खरीदें'),
                   onPressed: () => go('reorder', '${o['id']}')),
               CraftButton(
@@ -235,8 +272,14 @@ extension _BuyerExperience on _CommerceScreenState {
                       ? go('supplier', '${o['artisan_id']}')
                       : action(
                           'save_supplier', {'artisan_id': o['artisan_id']})),
-              if (o['review'] is Map)
-                Text('${o['review']['rating']} / 5 · ${o['review']['text']}'),
+              if (o['review'] is Map) ...[
+                const SizedBox(height: 8),
+                Text('${o['review']['rating']} ★ · ${o['review']['text']}',
+                    style: const TextStyle(
+                        fontSize: 12,
+                        fontStyle: FontStyle.italic,
+                        color: Color(0xFF285448))),
+              ]
             ])),
       ];
 
@@ -294,7 +337,7 @@ extension _BuyerExperience on _CommerceScreenState {
                 subtitle: Text('${n['time']}'),
                 onTap: n['link'] == null
                     ? null
-                    : () => context.push('/workspace/${n['link']}'))),
+                    : () => openNotification(n))),
       if (notificationFilter == 'All' || notificationFilter == 'Bidding') ...[
         if (sessions.isNotEmpty)
           Text(t('Current bidding activity', 'वर्तमान बोली गतिविधि')),

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/services/app_providers.dart';
+import '../../shared/models/account.dart';
 
 class LanguageSelectionScreen extends ConsumerWidget {
   const LanguageSelectionScreen({super.key});
@@ -17,6 +18,29 @@ class LanguageSelectionScreen extends ConsumerWidget {
     {'code': 'te', 'name': 'తెలుగు', 'sub': 'Telugu', 'flag': '🇮🇳'},
     {'code': 'kn', 'name': 'ಕನ್ನಡ', 'sub': 'Kannada', 'flag': '🇮🇳'},
   ];
+
+  /// Saves the choice on the signed-in account.
+  ///
+  /// The chat bridge reads each participant's language from their account, not
+  /// from this device, so a change made here has to reach the backend too.
+  /// Otherwise both sides keep their signup default and the server goes on
+  /// reporting "same language" while messages stay untranslated.
+  Future<void> _saveToAccount(WidgetRef ref, String language) async {
+    final session = ref.read(sessionProvider);
+    final account = session.account;
+    if (account == null) return;
+    try {
+      final accounts = ref.read(accountServiceProvider);
+      if (account.role == AccountRole.artisan) {
+        await accounts.updateArtisanProfile(languagePref: language);
+      } else {
+        await accounts.updateBuyerProfile(languagePref: language);
+      }
+      await session.refresh();
+    } catch (_) {
+      // Keep the local choice; the account is updated the next time it is saved.
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -154,6 +178,7 @@ class LanguageSelectionScreen extends ConsumerWidget {
                 onPressed: () async {
                   final prefs = await SharedPreferences.getInstance();
                   await prefs.setString('selected_language', selected);
+                  await _saveToAccount(ref, selected);
                   if (context.mounted) {
                     if (context.canPop()) {
                       context.pop();

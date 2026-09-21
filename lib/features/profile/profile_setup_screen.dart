@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/data/india_locations.dart';
 import '../../core/localization/app_strings.dart';
 import '../../core/services/app_providers.dart';
 import '../../shared/models/account.dart';
@@ -20,6 +21,11 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
   final _website = TextEditingController();
   final _state = TextEditingController();
   final _district = TextEditingController();
+  final _stateFocus = FocusNode();
+  final _districtFocus = FocusNode();
+
+  /// The state the city suggestions follow, once the typed text names one.
+  String? _stateName;
   String _craft = 'other';
   String _type = 'retailer';
   String _industry = 'handicrafts';
@@ -36,6 +42,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
     _website.text = '${a?.profile['website'] ?? ''}';
     _state.text = a?.state ?? '';
     _district.text = a?.profile['district'] as String? ?? '';
+    _stateName = canonicalState(_state.text);
     _craft = a?.craftCategory ?? 'other';
     _type = a?.profile['business_type'] as String? ?? 'retailer';
     _industry = a?.profile['industry'] as String? ?? 'handicrafts';
@@ -53,7 +60,28 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
     ]) {
       c.dispose();
     }
+    _stateFocus.dispose();
+    _districtFocus.dispose();
     super.dispose();
+  }
+
+  /// The city list follows the chosen state, so a state change drops a city
+  /// that no longer belongs to it.
+  void _onStateChanged(String value) {
+    final canonical = canonicalState(value);
+    final cleared = value.trim().isEmpty;
+    if (!cleared && canonical == _stateName) return;
+    setState(() {
+      _stateName = canonical;
+      final city = _district.text.trim();
+      if (cleared) {
+        _district.clear();
+      } else if (canonical != null &&
+          city.isNotEmpty &&
+          !citiesForState(canonical).contains(city)) {
+        _district.clear();
+      }
+    });
   }
 
   Future<void> _save(bool artisan) async {
@@ -207,13 +235,32 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                                   'other': t('Other', 'अन्य')
                                 },
                                 (v) => _craft = v),
-                          _field(
-                              _state,
-                              t('State / Union territory',
+                          _placeField(
+                              key: const Key('profile-state'),
+                              controller: _state,
+                              focusNode: _stateFocus,
+                              label: t('State / Union territory',
                                   'राज्य / केंद्र शासित प्रदेश'),
-                              Icons.location_on_outlined),
-                          _field(_district, t('City / District', 'शहर / जिला'),
-                              Icons.location_city_outlined),
+                              icon: Icons.location_on_outlined,
+                              options: indiaStates,
+                              enabled: !_saving,
+                              missing: t('Please complete this field',
+                                  'यह जानकारी भरें'),
+                              onChanged: _onStateChanged),
+                          _placeField(
+                              key: const Key('profile-city'),
+                              controller: _district,
+                              focusNode: _districtFocus,
+                              label: t('City / District', 'शहर / जिला'),
+                              hint: _stateName == null
+                                  ? t('Choose a state first',
+                                      'पहले राज्य चुनें')
+                                  : null,
+                              icon: Icons.location_city_outlined,
+                              options: citiesForState(_stateName),
+                              enabled: !_saving,
+                              missing: t('Please complete this field',
+                                  'यह जानकारी भरें')),
                           if (_error != null)
                             Padding(
                                 padding: const EdgeInsets.only(bottom: 16),
@@ -310,4 +357,71 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                       DropdownMenuItem(value: e.key, child: Text(e.value)))
                   .toList(),
               onChanged: _saving ? null : (v) => setState(() => update(v!))));
+
+  /// A place field: type to narrow the list, or pick from it.
+  ///
+  /// The suggestions are a help, not a constraint — a city the bundled list
+  /// does not carry can still be typed by hand.
+  Widget _placeField(
+          {required Key key,
+          required TextEditingController controller,
+          required FocusNode focusNode,
+          required String label,
+          required IconData icon,
+          required List<String> options,
+          required bool enabled,
+          required String missing,
+          String? hint,
+          ValueChanged<String>? onChanged}) =>
+      Padding(
+          key: key,
+          padding: const EdgeInsets.only(bottom: 18),
+          child: RawAutocomplete<String>(
+              textEditingController: controller,
+              focusNode: focusNode,
+              optionsBuilder: (value) {
+                final query = value.text.trim().toLowerCase();
+                if (query.isEmpty) return options;
+                return options
+                    .where((option) => option.toLowerCase().contains(query));
+              },
+              onSelected: onChanged,
+              fieldViewBuilder: (context, text, focus, onFieldSubmitted) =>
+                  TextFormField(
+                      controller: text,
+                      focusNode: focus,
+                      enabled: enabled,
+                      maxLength: 100,
+                      textCapitalization: TextCapitalization.words,
+                      textInputAction: TextInputAction.next,
+                      onChanged: onChanged,
+                      onFieldSubmitted: (_) => onFieldSubmitted(),
+                      validator: (v) =>
+                          (v?.trim().isEmpty ?? true) ? missing : null,
+                      decoration: InputDecoration(
+                          labelText: label,
+                          hintText: hint,
+                          prefixIcon: Icon(icon),
+                          counterText: '')),
+              optionsViewBuilder: (context, onSelected, matches) => Align(
+                  alignment: Alignment.topLeft,
+                  child: Material(
+                      elevation: 4,
+                      borderRadius: BorderRadius.circular(12),
+                      clipBehavior: Clip.antiAlias,
+                      child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxHeight: 264),
+                          child: ListView.builder(
+                              padding: EdgeInsets.zero,
+                              shrinkWrap: true,
+                              itemCount: matches.length,
+                              itemBuilder: (context, index) {
+                                final option = matches.elementAt(index);
+                                return InkWell(
+                                    onTap: () => onSelected(option),
+                                    child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 16, vertical: 12),
+                                        child: Text(option)));
+                              }))))));
 }
