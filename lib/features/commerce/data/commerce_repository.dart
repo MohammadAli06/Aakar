@@ -740,7 +740,7 @@ class CommerceRepository extends ChangeNotifier {
     };
   }
 
-  Future<void> sendVoice(Record inquiry, String path) async {
+  Future<void> sendVoice(Record inquiry, String path, {int seconds = 0}) async {
     if (busy) throw WorkflowError('Please wait for the workspace');
     if (inquiry['server'] != true || !signedIn) {
       throw WorkflowError('Voice notes require a shared account inquiry.');
@@ -748,7 +748,8 @@ class CommerceRepository extends ChangeNotifier {
     busy = true;
     notifyListeners();
     try {
-      final row = await _inquiries.voice('${inquiry['id']}', path);
+      final row =
+          await _inquiries.voice('${inquiry['id']}', path, seconds: seconds);
       state['inquiries'] = table('inquiries')
           .map((r) => r['id'] == row['id'] ? row : r)
           .toList();

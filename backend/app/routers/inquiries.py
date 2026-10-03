@@ -17,7 +17,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile, File
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
@@ -34,6 +34,7 @@ from app.models.models import (
 router = APIRouter()
 VOICE_MEDIA = Path(__file__).parents[2] / 'uploads' / 'inquiry_voice'
 MAX_VOICE_BYTES = 5 * 1024 * 1024
+MAX_VOICE_SECONDS = 120
 
 CAPACITY_STATUSES = ('confirmed', 'partial', 'declined')
 MILESTONE_TRIGGERS = ('advance', 'checkpoint', 'dispatch', 'delivery')
@@ -421,6 +422,7 @@ async def add_message(
 
 @router.post('/{inquiry_id}/voice')
 async def send_voice(inquiry_id: str, file: UploadFile = File(...),
+                     duration: int = Form(0),
                      user: User = Depends(get_current_user),
                      db: AsyncSession = Depends(get_db)):
     row = await _load(db, inquiry_id)
@@ -438,6 +440,9 @@ async def send_voice(inquiry_id: str, file: UploadFile = File(...),
     row.messages = [*(row.messages or []), {
         'id': _ident('message'), 'kind': 'voice', 'text': '', 'translation': '',
         'voice': name, 'role': role, 'actor': user.id, 'time': _now(),
+        # The recording screen already counted the length; carry it so the
+        # bubble shows the clip's seconds instead of waiting for playback.
+        'duration': max(0, min(duration, MAX_VOICE_SECONDS)),
         'provenance': 'Original voice note',
     }]
     await _notify_message(db, row, role)

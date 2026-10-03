@@ -454,13 +454,23 @@ class InquiryApiTests(unittest.TestCase):
         audio = b'\x00\x00\x00\x20ftypM4A \x00\x00\x00\x08mdat' + b'\x00' * 40
 
         sent = self.client.post(f"{self.base}/{inquiry['id']}/voice", headers=self.kim,
+                                data={'duration': '9'},
                                 files={'file': ('note.m4a', audio, 'audio/mp4')})
         self.assertEqual(sent.status_code, 200, sent.text)
         message = sent.json()['messages'][-1]
         self.assertEqual(message['kind'], 'voice')
         self.assertEqual(message['provenance'], 'Original voice note')
+        # The recorder's counter travels with the upload, so the bubble can show
+        # the clip length without waiting for playback.
+        self.assertEqual(message['duration'], 9)
         self.assertRegex(message['voice'], r'^[a-f0-9]{32}\.m4a$')
         name = message['voice']
+
+        measured = self.client.post(f"{self.base}/{inquiry['id']}/voice", headers=self.raj,
+                                    data={'duration': '9000'},
+                                    files={'file': ('note.m4a', audio, 'audio/mp4')})
+        self.assertEqual(measured.status_code, 200, measured.text)
+        self.assertEqual(measured.json()['messages'][-1]['duration'], 120)
 
         heard = self.client.get(f"{self.base}/{inquiry['id']}/voice/{name}", headers=self.raj)
         self.assertEqual(heard.status_code, 200)

@@ -376,7 +376,8 @@ class _InquiryChatState extends State<InquiryChat> with WidgetsBindingObserver {
       _error = null;
     });
     try {
-      await widget.repository.sendVoice(widget.inquiry, _voicePath!);
+      await widget.repository.sendVoice(widget.inquiry, _voicePath!,
+          seconds: _seconds);
       await _deleteVoice();
       _bottom();
     } catch (e) {
@@ -461,6 +462,8 @@ class _InquiryChatState extends State<InquiryChat> with WidgetsBindingObserver {
                                     if (m['kind'] == 'voice')
                                       VoiceNotePlayer(
                                           key: ValueKey(m['id']),
+                                          seconds: (m['duration'] as num?)
+                                              ?.toInt(),
                                           load: () async {
                                             final bytes = await repo.voiceBytes(
                                                 '${r['id']}', '${m['voice']}');
@@ -531,6 +534,7 @@ class _InquiryChatState extends State<InquiryChat> with WidgetsBindingObserver {
                             Expanded(
                                 child: VoiceNotePlayer(
                                     key: ValueKey(_voicePath),
+                                    seconds: _seconds,
                                     load: () async => _voicePath!,
                                     deleteOnDispose: false)),
                             IconButton(
@@ -579,18 +583,34 @@ class _InquiryChatState extends State<InquiryChat> with WidgetsBindingObserver {
 class VoiceNotePlayer extends StatefulWidget {
   final Future<String> Function() load;
   final bool deleteOnDispose;
+
+  /// The clip's length in seconds when it is already known — the recorder's
+  /// counter while previewing, or the `duration` the backend stored with a
+  /// sent note. Without it the length only arrives once playback loads the
+  /// file, so the label read `0s` until the note was played.
+  final int? seconds;
   const VoiceNotePlayer(
-      {super.key, required this.load, this.deleteOnDispose = true});
+      {super.key,
+      required this.load,
+      this.deleteOnDispose = true,
+      this.seconds});
   @override
   State<VoiceNotePlayer> createState() => _VoiceNotePlayerState();
 }
 
 class _VoiceNotePlayerState extends State<VoiceNotePlayer> {
   AudioPlayer? _player;
-  StreamSubscription? _state, _position;
+  StreamSubscription? _state, _position, _duration;
   bool _playing = false, _loading = false;
   String? _path, _error;
-  int _seconds = 0;
+  int _seconds = 0, _length = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _length = widget.seconds ?? 0;
+  }
+
   Future<void> _play() async {
     setState(() {
       _loading = true;
@@ -604,6 +624,9 @@ class _VoiceNotePlayerState extends State<VoiceNotePlayer> {
         });
         _position = _player!.onPositionChanged.listen((p) {
           if (mounted) setState(() => _seconds = p.inSeconds);
+        });
+        _duration = _player!.onDurationChanged.listen((d) {
+          if (mounted && d.inSeconds > 0) setState(() => _length = d.inSeconds);
         });
       }
       if (_playing) {
@@ -625,6 +648,7 @@ class _VoiceNotePlayerState extends State<VoiceNotePlayer> {
   void dispose() {
     _state?.cancel();
     _position?.cancel();
+    _duration?.cancel();
     _player?.dispose();
     final path = _path;
     if (path != null && widget.deleteOnDispose)
@@ -648,7 +672,7 @@ class _VoiceNotePlayerState extends State<VoiceNotePlayer> {
         Flexible(
             child: Text(
                 _error ??
-                    '${bilingual(context, 'Voice note', 'वॉइस नोट')} · ${_seconds}s',
+                    '${bilingual(context, 'Voice note', 'वॉइस नोट')} · ${_playing ? _seconds : _length}s',
                 style: const TextStyle(fontSize: 11))),
       ]);
 }

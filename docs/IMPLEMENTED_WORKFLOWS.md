@@ -1,5 +1,7 @@
 # Implemented mobile and admin workflows
 
+**Voice notes show their recorded length, 2026-09-22:** a note that had just been recorded or sent read `Voice note · 0s`, because the bubble's counter only advanced from `onPositionChanged` while playing and the recording screen's own seconds were discarded when the file was uploaded. The recorder's counter now travels with the upload as a `duration` form field on `POST /api/v1/inquiries/{id}/voice`, is clamped to the 120-second recording limit and stored on the message, so the bubble shows the clip's length before it is played. `VoiceNotePlayer` takes that known length for both the preview and the sent bubble, and still falls back to `onDurationChanged` for notes stored before the field existed. Covered by `backend/tests/test_inquiries_api.py` (duration round trip and clamp) and `test/voice_note_player_test.dart` (a stored length renders in English and Hindi without playback). Device validation of the recording-to-bubble hand-off is still pending.
+
 **Buyer Requirement Matches Engine (Title-First Multi-Parameter Scoring), 2026-09-19:**
 Enhanced `CommerceEngine.matches()` and the "Find matches" screen (`matches()` in `commerce_screen.dart`):
 - **Weighted Multi-Parameter Scoring Model (0–100%):**

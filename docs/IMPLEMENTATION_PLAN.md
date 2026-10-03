@@ -1,5 +1,12 @@
 # Implementation plan and demo checklist
 
+## Voice note length — 2026-09-22
+
+- [x] Carry the recorder's counter through the upload: `POST /inquiries/{id}/voice` accepts a `duration` form field, clamped to the 120-second recording limit, and stores it on the voice message.
+- [x] Show the clip length in the bubble before playback: `VoiceNotePlayer` takes the known `seconds` (the recorder's counter while previewing, the stored `duration` once sent) and fills it from `onDurationChanged` when only the audio knows.
+- [x] Cover with `backend/tests/test_inquiries_api.py` (round trip and clamp) and `test/voice_note_player_test.dart`.
+- [ ] Confirm on a device: record a note and watch the preview and the sent bubble show the recorded seconds rather than 0s.
+
 ## Notification alert fixes — 2026-09-19
 
 - [x] Keep a signed-in account's alerts server-only: device-local demo notifications no longer merge into the account list, so the bell's unread count cannot include a row the backend cannot mark read.

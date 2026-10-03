@@ -41,8 +41,10 @@ class InquiryService {
             if (productId != null) 'product_id': productId
           }));
 
-  Future<Map<String, dynamic>> voice(String id, String path) async =>
-      _asMap(await _api.uploadFile('/inquiries/$id/voice', path));
+  Future<Map<String, dynamic>> voice(String id, String path,
+          {int seconds = 0}) async =>
+      _asMap(await _api.uploadFile('/inquiries/$id/voice', path,
+          fields: {'duration': '$seconds'}));
 
   Future<Uint8List> voiceBytes(String id, String name) =>
       _api.getBytes('/inquiries/$id/voice/${Uri.encodeComponent(name)}');
